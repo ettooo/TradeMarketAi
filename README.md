@@ -1,7 +1,7 @@
 # TradeMarketAi
 Teramo Ettore
 
-### Name of the project
+## Name of the project
 TradeMarketAI
 
 # Tagline
