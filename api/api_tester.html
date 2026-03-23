@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API Tester - TradeMarketAi</title>
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #0d0f1a;
+      --surface: #151828;
+      --card: #1c2035;
+      --border: #272d4a;
+      --accent: #6c63ff;
+      --accent2: #00d4aa;
+      --text: #e8eaf0;
+      --muted: #7a82a8;
+      --error: #ff5370;
+      --success: #4caf83;
+      --warn: #f59e0b;
+      --radius: 12px;
+      --method-get: #00d4aa;
+      --method-post: #6c63ff;
+      --method-put: #f59e0b;
+      --method-delete: #ff5370;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, monospace;
+      min-height: 100vh;
+    }
+
+    /* TOP BAR */
+    .topbar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .topbar .logo {
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    .topbar .logo span {
+      color: var(--accent);
+    }
+
+    .base-url-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-left: auto;
+    }
+
+    .base-url-row label {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .base-url-row input {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 7px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      width: 280px;
+      outline: none;
+    }
+
+    .base-url-row input:focus {
+      border-color: var(--accent);
+    }
+
+    /* LAYOUT */
+    .layout {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      min-height: calc(100vh - 57px);
+    }
+
+    /* SIDEBAR */
+    .sidebar {
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 20px 12px;
+      overflow-y: auto;
+    }
+
+    .sidebar-section {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: 12px 10px 6px;
+    }
+
+    .endpoint-btn {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: none;
+      border: none;
+      color: var(--text);
+      padding: 9px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      text-align: left;
+      transition: background .15s;
+      margin-bottom: 2px;
+    }
+
+    .endpoint-btn:hover {
+      background: rgba(108, 99, 255, .1);
+    }
+
+    .endpoint-btn.active {
+      background: rgba(108, 99, 255, .18);
+      color: var(--accent);
+    }
+
+    .method-badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      flex-shrink: 0;
+      width: 46px;
+      text-align: center;
+    }
+
+    .GET {
+      background: rgba(0, 212, 170, .15);
+      color: var(--method-get);
+    }
+
+    .POST {
+      background: rgba(108, 99, 255, .15);
+      color: var(--method-post);
+    }
+
+    .PUT {
+      background: rgba(245, 158, 11, .15);
+      color: var(--method-put);
+    }
+
+    .DELETE {
+      background: rgba(255, 83, 112, .15);
+      color: var(--method-delete);
+    }
+
+    /* MAIN PANEL */
+    .panel {
+      padding: 32px;
+      overflow-y: auto;
+    }
+
+    .panel-header {
+      margin-bottom: 24px;
+    }
+
+    .panel-header h2 {
+      font-size: 22px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+
+    .panel-header p {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    /* FORM CARD */
+    .form-card,
+    .response-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px;
+    }
+
+    .form-card h3,
+    .response-card h3 {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      margin-bottom: 16px;
+    }
+
+    .field {
+      margin-bottom: 14px;
+    }
+
+    .field label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+    }
+
+    .field input,
+    .field textarea,
+    .field select {
+      width: 100%;
+      padding: 10px 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 13px;
+      outline: none;
+      font-family: inherit;
+    }
+
+    .field input:focus,
+    .field textarea:focus {
+      border-color: var(--accent);
+    }
+
+    .field textarea {
+      min-height: 90px;
+      resize: vertical;
+      font-family: 'Consolas', 'Courier New', monospace;
+    }
+
+    .btn-run {
+      width: 100%;
+      padding: 12px;
+      background: linear-gradient(135deg, var(--accent), #8b5cf6);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
+      border: none;
+      border-radius: 9px;
+      cursor: pointer;
+      transition: opacity .2s;
+      margin-top: 4px;
+    }
+
+    .btn-run:hover {
+      opacity: .88;
+    }
+
+    /* TOKEN BAR */
+    .token-bar {
+      background: rgba(108, 99, 255, .08);
+      border: 1px solid rgba(108, 99, 255, .2);
+      border-radius: 10px;
+      padding: 14px 18px;
+      margin-bottom: 22px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .token-bar .lbl {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .token-bar .val {
+      font-family: monospace;
+      font-size: 12px;
+      color: var(--accent2);
+      word-break: break-all;
+      flex: 1;
+    }
+
+    .token-bar .timer {
+      font-size: 12px;
+      color: var(--warn);
+      font-weight: 600;
+      margin-left: auto;
+    }
+
+    /* RESPONSE */
+    .response-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 5px 12px;
+      border-radius: 6px;
+      margin-bottom: 14px;
+    }
+
+    .status-2xx {
+      background: rgba(76, 175, 131, .15);
+      color: var(--success);
+    }
+
+    .status-4xx {
+      background: rgba(255, 83, 112, .15);
+      color: var(--error);
+    }
+
+    .status-5xx {
+      background: rgba(245, 158, 11, .15);
+      color: var(--warn);
+    }
+
+    .response-body {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 12px;
+      overflow: auto;
+      max-height: 360px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: #a8d8b8;
+    }
+
+    /* HINT */
+    .hint {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    .hint a {
+      color: var(--accent);
+      cursor: pointer;
+      text-decoration: none;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="topbar">
+    <div class="logo">Auth<span>System</span> — <span style="color:var(--accent2);font-size:16px">API Tester</span>
+    </div>
+    <div class="base-url-row">
+      <label>Base URL</label>
+      <input type="text" id="baseUrl" value="http://localhost/progetto/api/index.php/">
+    </div>
+  </div>
+
+  <div class="layout">
+
+    <!-- SIDEBAR -->
+    <nav class="sidebar">
+      <div class="sidebar-section">🔐 Autenticazione</div>
+      <button class="endpoint-btn active" data-endpoint="login">
+        <span class="method-badge POST">POST</span>/auth/login
+      </button>
+      <button class="endpoint-btn" data-endpoint="refresh">
+        <span class="method-badge POST">POST</span>/auth/refresh
+      </button>
+      <button class="endpoint-btn" data-endpoint="logout">
+        <span class="method-badge POST">POST</span>/auth/logout
+      </button>
+
+      <div class="sidebar-section">👤 Utente corrente</div>
+      <button class="endpoint-btn" data-endpoint="me-permissions">
+        <span class="method-badge GET">GET</span>/me/permissions
+      </button>
+
+      <div class="sidebar-section">🛡️ Gestione permessi (Admin)</div>
+      <button class="endpoint-btn" data-endpoint="list-permissions">
+        <span class="method-badge GET">GET</span>/permissions
+      </button>
+      <button class="endpoint-btn" data-endpoint="create-permission">
+        <span class="method-badge POST">POST</span>/permissions
+      </button>
+      <button class="endpoint-btn" data-endpoint="update-permission">
+        <span class="method-badge PUT">PUT</span>/permissions/{id}
+      </button>
+      <button class="endpoint-btn" data-endpoint="delete-permission">
+        <span class="method-badge DELETE">DELETE</span>/permissions/{id}
+      </button>
+
+      <div class="sidebar-section">👥 Permessi utenti (Admin)</div>
+      <button class="endpoint-btn" data-endpoint="user-permissions">
+        <span class="method-badge GET">GET</span>/users/{id}/permissions
+      </button>
+      <button class="endpoint-btn" data-endpoint="add-user-permission">
+        <span class="method-badge POST">POST</span>/users/{id}/permissions
+      </button>
+      <button class="endpoint-btn" data-endpoint="remove-user-permission">
+        <span class="method-badge DELETE">DELETE</span>/users/{id}/permissions/{pid}
+      </button>
+    </nav>
+
+    <!-- MAIN PANEL -->
+    <main class="panel">
+
+      <!-- TOKEN BAR -->
+      <div class="token-bar" id="tokenBar" style="display:none">
+        <span class="lbl">🔑 Access Token:</span>
+        <span class="val" id="tokenDisplay">—</span>
+        <span class="timer" id="tokenTimer"></span>
+      </div>
+
+      <div class="panel-header">
+        <h2 id="endpointTitle"><span class="method-badge POST" id="methodBadge">POST</span> /auth/login</h2>
+        <p id="endpointDesc">Effettua il login e ottieni Access Token + Refresh Token</p>
+      </div>
+
+      <div class="row">
+        <div class="form-card">
+          <h3>📤 Parametri</h3>
+          <div id="formFields"></div>
+          <button class="btn-run" onclick="runRequest()">▶ Esegui richiesta</button>
+        </div>
+        <div class="response-card">
+          <h3>📥 Risposta</h3>
+          <div id="responseStatus"></div>
+          <div class="response-body" id="responseBody">// La risposta apparirà qui...</div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <script>
+    // ─── Stato globale ────────────────────────────
+    let state = {
+      accessToken: localStorage.getItem('at') || '',
+      refreshToken: localStorage.getItem('rt') || '',
+      tokenExp: parseInt(localStorage.getItem('exp') || '0'),
+    };
+
+    // ─── Definizione endpoint ─────────────────────
+    const endpoints = {
+      'login': {
+        method: 'POST', path: '/auth/login', auth: false,
+        title: '/auth/login', desc: 'Login con email e password. Ricevi Access + Refresh Token.',
+        fields: [
+          { id: 'email', label: 'Email', type: 'text', value: 'admin@example.com' },
+          { id: 'password', label: 'Password', type: 'text', value: 'Admin@1234' },
+        ]
+      },
+      'refresh': {
+        method: 'POST', path: '/auth/refresh', auth: false,
+        title: '/auth/refresh', desc: 'Rinnova l\'Access Token usando il Refresh Token (token rotation).',
+        fields: [
+          { id: 'refresh_token', label: 'Refresh Token', type: 'textarea', value: '', hint: 'Compilato automaticamente dopo il login' },
+        ]
+      },
+      'logout': {
+        method: 'POST', path: '/auth/logout', auth: false,
+        title: '/auth/logout', desc: 'Revoca il Refresh Token (logout).',
+        fields: [
+          { id: 'refresh_token', label: 'Refresh Token', type: 'textarea', value: '', hint: 'Compilato automaticamente dopo il login' },
+        ]
+      },
+      'me-permissions': {
+        method: 'GET', path: '/me/permissions', auth: true,
+        title: '/me/permissions', desc: 'Recupera i permessi dell\'utente autenticato tramite JWT.',
+        fields: []
+      },
+      'list-permissions': {
+        method: 'GET', path: '/permissions', auth: true,
+        title: '/permissions', desc: 'Lista tutti i permessi del sistema (richiede manage_permissions).',
+        fields: []
+      },
+      'create-permission': {
+        method: 'POST', path: '/permissions', auth: true,
+        title: '/permissions', desc: 'Crea un nuovo permesso nel sistema.',
+        fields: [
+          { id: 'name', label: 'name (snake_case)', type: 'text', value: 'new_feature' },
+          { id: 'description', label: 'description', type: 'text', value: 'Descrizione del nuovo permesso' },
+        ]
+      },
+      'update-permission': {
+        method: 'PUT', path: '/permissions/{id}', auth: true,
+        title: '/permissions/{id}', desc: 'Aggiorna nome/descrizione di un permesso esistente.',
+        fields: [
+          { id: '_id', label: 'ID permesso (URL)', type: 'text', value: '11' },
+          { id: 'name', label: 'Nuovo name', type: 'text', value: '' },
+          { id: 'description', label: 'Nuova description', type: 'text', value: '' },
+        ]
+      },
+      'delete-permission': {
+        method: 'DELETE', path: '/permissions/{id}', auth: true,
+        title: '/permissions/{id}', desc: 'Elimina un permesso (e lo rimuove da tutti i ruoli).',
+        fields: [
+          { id: '_id', label: 'ID permesso (URL)', type: 'text', value: '11' },
+        ]
+      },
+      'user-permissions': {
+        method: 'GET', path: '/users/{id}/permissions', auth: true,
+        title: '/users/{id}/permissions', desc: 'Lista i permessi di uno specifico utente.',
+        fields: [
+          { id: '_id', label: 'User ID (URL)', type: 'text', value: '1' },
+        ]
+      },
+      'add-user-permission': {
+        method: 'POST', path: '/users/{id}/permissions', auth: true,
+        title: '/users/{id}/permissions', desc: 'Aggiunge un permesso al ruolo dell\'utente.',
+        fields: [
+          { id: '_id', label: 'User ID (URL)', type: 'text', value: '1' },
+          { id: 'permission_id', label: 'permission_id', type: 'text', value: '' },
+        ]
+      },
+      'remove-user-permission': {
+        method: 'DELETE', path: '/users/{id}/permissions/{pid}', auth: true,
+        title: '/users/{id}/permissions/{pid}', desc: 'Rimuove un permesso dal ruolo dell\'utente.',
+        fields: [
+          { id: '_id', label: 'User ID (URL)', type: 'text', value: '1' },
+          { id: '_pid', label: 'Permission ID (URL)', type: 'text', value: '' },
+        ]
+      },
+    };
+
+    // ─── Render endpoint ──────────────────────────
+    let current = 'login';
+
+    function loadEndpoint(key) {
+      current = key;
+      const ep = endpoints[key];
+
+      document.querySelectorAll('.endpoint-btn').forEach(b => b.classList.toggle('active', b.dataset.endpoint === key));
+
+      const mColor = { GET: 'var(--method-get)', POST: 'var(--method-post)', PUT: 'var(--method-put)', DELETE: 'var(--method-delete)' };
+      document.getElementById('methodBadge').textContent = ep.method;
+      document.getElementById('methodBadge').style.cssText = `background:${mColor[ep.method]}22;color:${mColor[ep.method]};font-size:12px;font-weight:700;padding:3px 10px;border-radius:5px;`;
+      document.getElementById('endpointTitle').innerHTML = document.getElementById('methodBadge').outerHTML + ' ' + ep.title;
+      document.getElementById('endpointDesc').textContent = ep.desc;
+
+      const form = document.getElementById('formFields');
+      form.innerHTML = '';
+
+      // Auto-fill refresh token
+      if (key === 'refresh' || key === 'logout') {
+        ep.fields.find(f => f.id === 'refresh_token').value = state.refreshToken;
+      }
+
+      ep.fields.forEach(f => {
+        const div = document.createElement('div');
+        div.className = 'field';
+        const tag = f.type === 'textarea' ? 'textarea' : 'input';
+        const attrs = tag === 'textarea' ? '' : `type="text"`;
+        div.innerHTML = `<label>${f.label}${ep.auth && f.id !== '_id' && f.id !== '_pid' ? '' : ''}</label>
+      <${tag} ${attrs} id="f_${f.id}" placeholder="${f.label}">${f.type === 'textarea' ? (f.value || '') : ''}</${tag === 'textarea' ? 'textarea' : 'input'}>
+      ${f.hint ? `<div class="hint">ℹ️ ${f.hint}</div>` : ''}`;
+        if (tag !== 'textarea') div.querySelector('input').value = f.value || '';
+        form.appendChild(div);
+      });
+
+      if (ep.auth) {
+        form.insertAdjacentHTML('afterbegin', `
+      <div class="field">
+        <label>🔑 Authorization (auto)</label>
+        <input type="text" id="f__jwt" value="${state.accessToken}" placeholder="Bearer token (auto-fill dal login)">
+        <div class="hint">Compilato automaticamente dopo il login. <a onclick="document.getElementById('f__jwt').value=state.accessToken">Ripristina</a></div>
+      </div>`);
+      }
+
+      document.getElementById('responseBody').textContent = '// La risposta apparirà qui...';
+      document.getElementById('responseStatus').innerHTML = '';
+    }
+
+    // ─── Esegui richiesta ─────────────────────────
+    async function runRequest() {
+      const ep = endpoints[current];
+      const baseUrl = document.getElementById('baseUrl').value.replace(/\/$/, '');
+
+      // Costruisci URL sostituendo parametri path
+      let path = ep.path;
+      if (document.getElementById('f__id')) path = path.replace('{id}', document.getElementById('f__id').value);
+      if (document.getElementById('f__pid')) path = path.replace('{pid}', document.getElementById('f__pid').value);
+
+      const url = baseUrl + path;
+
+      // Headers
+      const headers = { 'Content-Type': 'application/json' };
+      if (ep.auth) {
+        const jwt = document.getElementById('f__jwt')?.value || state.accessToken;
+        if (jwt) headers['Authorization'] = 'Bearer ' + jwt;
+      }
+
+      // Body
+      let body = undefined;
+      if (ep.method !== 'GET') {
+        const bodyObj = {};
+        ep.fields.filter(f => !f.id.startsWith('_')).forEach(f => {
+          const el = document.getElementById('f_' + f.id);
+          if (el && el.value) bodyObj[f.id] = el.value;
+        });
+        if (Object.keys(bodyObj).length) body = JSON.stringify(bodyObj);
+      }
+
+      let status = 0, data = {};
+      try {
+        const res = await fetch(url, { method: ep.method, headers, body });
+        status = res.status;
+        data = await res.json();
+      } catch (e) {
+        document.getElementById('responseBody').textContent = '// Errore di rete: ' + e.message + '\n\nAssicurati che il server PHP sia avviato e il Base URL sia corretto.';
+        return;
+      }
+
+      // Mostra status
+      const cls = status >= 500 ? 'status-5xx' : status >= 400 ? 'status-4xx' : 'status-2xx';
+      document.getElementById('responseStatus').innerHTML = `<div class="response-status ${cls}">${status} ${statusText(status)}</div>`;
+      document.getElementById('responseBody').textContent = JSON.stringify(data, null, 2);
+
+      // Salva token se login/refresh ok
+      if ((current === 'login' || current === 'refresh') && data.access_token) {
+        state.accessToken = data.access_token;
+        state.refreshToken = data.refresh_token;
+        state.tokenExp = Math.floor(Date.now() / 1000) + (data.expires_in || 600);
+        localStorage.setItem('at', state.accessToken);
+        localStorage.setItem('rt', state.refreshToken);
+        localStorage.setItem('exp', state.tokenExp);
+        updateTokenBar();
+      }
+      if (current === 'logout') {
+        state.accessToken = state.refreshToken = '';
+        localStorage.removeItem('at'); localStorage.removeItem('rt'); localStorage.removeItem('exp');
+        updateTokenBar();
+      }
+    }
+
+    function statusText(code) {
+      const map = { 200: 'OK', 201: 'Created', 204: 'No Content', 400: 'Bad Request', 401: 'Unauthorized', 403: 'Forbidden', 404: 'Not Found', 409: 'Conflict', 422: 'Unprocessable Entity', 500: 'Internal Server Error' };
+      return map[code] || '';
+    }
+
+    // ─── Token Bar ────────────────────────────────
+    function updateTokenBar() {
+      const bar = document.getElementById('tokenBar');
+      if (!state.accessToken) { bar.style.display = 'none'; return; }
+      bar.style.display = 'flex';
+      const short = state.accessToken.substring(0, 40) + '...';
+      document.getElementById('tokenDisplay').textContent = short;
+    }
+
+    function startTimer() {
+      setInterval(() => {
+        if (!state.tokenExp) return;
+        const left = state.tokenExp - Math.floor(Date.now() / 1000);
+        const el = document.getElementById('tokenTimer');
+        if (left <= 0) {
+          el.textContent = '⏰ Token scaduto!';
+          el.style.color = 'var(--error)';
+        } else {
+          const m = Math.floor(left / 60), s = left % 60;
+          el.textContent = `⏱ ${m}:${String(s).padStart(2, '0')} alla scadenza`;
+          el.style.color = left < 60 ? 'var(--error)' : 'var(--warn)';
+        }
+      }, 1000);
+    }
+
+    // ─── Init ─────────────────────────────────────
+    document.querySelectorAll('.endpoint-btn').forEach(btn => {
+      btn.addEventListener('click', () => loadEndpoint(btn.dataset.endpoint));
+    });
+
+    loadEndpoint('login');
+    updateTokenBar();
+    startTimer();
+  </script>
+</body>
+
+</html>
