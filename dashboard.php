@@ -85,12 +85,6 @@ if (($_GET['tx'] ?? '') === 'enabled') {
     $flashSuccess = 'Transazioni disabilitate correttamente.';
 }
 
-if (($_GET['cursor'] ?? '') === 'enabled') {
-    $flashSuccess = 'Cursori live abilitati correttamente.';
-} elseif (($_GET['cursor'] ?? '') === 'disabled') {
-    $flashSuccess = 'Cursori live disabilitati correttamente.';
-}
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($isAdminPreview) {
         header('Location: dashboard.php?error=preview_readonly');
@@ -221,35 +215,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    if ($action === 'toggle_cursor_tracking') {
-        if (!$has('manage_users')) {
-            header('Location: dashboard.php?error=permission_denied');
-            exit;
-        }
-
-        $newValue = (($_POST['cursor_tracking_enabled'] ?? '0') === '1') ? '1' : '0';
-
-        try {
-            $pdoTx = getDB();
-            $pdoTx->beginTransaction();
-            $pdoTx->exec("INSERT IGNORE INTO system_settings (setting_key, setting_value) VALUES ('cursor_tracking_enabled', '1')");
-
-            $updCursorStmt = $pdoTx->prepare('UPDATE system_settings SET setting_value = ? WHERE setting_key = ?');
-            $updCursorStmt->execute([$newValue, 'cursor_tracking_enabled']);
-
-            $pdoTx->commit();
-            $cursorStatus = $newValue === '1' ? 'enabled' : 'disabled';
-            header('Location: dashboard.php?cursor=' . $cursorStatus . '#admin');
-            exit;
-        } catch (Throwable $e) {
-            if (isset($pdoTx) && $pdoTx instanceof PDO && $pdoTx->inTransaction()) {
-                $pdoTx->rollBack();
-            }
-
-            header('Location: dashboard.php?error=cursor_config_error#admin');
-            exit;
-        }
-    }
 }
 
 $pdo = null;
@@ -262,22 +227,9 @@ $viewAccessRows = [];
 $activeSessionsRows = [];
 $transactionsEnabled = true;
 $transactionsConfigAvailable = true;
-$cursorTrackingEnabled = true;
 
 try {
     $pdo = getDB();
-
-    // Leggi stato cursor tracking
-    try {
-        $cursorStmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'cursor_tracking_enabled' LIMIT 1");
-        $cursorStmt->execute();
-        $cursorRow = $cursorStmt->fetch();
-        if ($cursorRow) {
-            $cursorTrackingEnabled = ((string)$cursorRow['setting_value'] === '1');
-        }
-    } catch (Throwable $e) {
-        $cursorTrackingEnabled = true;
-    }
 
     if ($has('view_market_data')) {
         $marketRows = $pdo->query('SELECT symbol, name, price, change_pct, volume, market_cap, fetched_at FROM market_data ORDER BY symbol LIMIT 10')->fetchAll();
@@ -361,11 +313,6 @@ try {
 
 $initial = strtoupper(substr($username, 0, 1));
 $csrfToken = getCsrfToken();
-$cursorRoom = 'tm_ai/dashboard/live_cursor';
-$cursorClientSuffix = bin2hex(random_bytes(4));
-$cursorClientId = 'tmai-' . $userId . '-' . $cursorClientSuffix;
-$showCursorLiveSection = $isAdminPreview || (!$sessionCanManageUsers && $cursorTrackingEnabled);
-$showAdminCursorMonitor = $sessionCanManageUsers && !$isAdminPreview;
 ?>
 <!DOCTYPE html>
 <html lang="it">
@@ -794,85 +741,6 @@ $showAdminCursorMonitor = $sessionCanManageUsers && !$isAdminPreview;
             display: none;
         }
 
-        .cursor-section {
-            position: relative;
-            overflow: hidden;
-        }
-
-        .cursor-status {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            align-items: center;
-            margin-bottom: 8px;
-        }
-
-        .cursor-badge {
-            border: 1px solid var(--line);
-            background: var(--surface);
-            border-radius: 999px;
-            padding: 5px 10px;
-            font-size: .78rem;
-            font-weight: 700;
-            color: var(--muted);
-        }
-
-        .cursor-badge.ok {
-            border-color: #8de2bb;
-            background: #ecfdf3;
-            color: #067647;
-        }
-
-        .cursor-stage {
-            border: 1px dashed var(--line);
-            border-radius: 10px;
-            padding: 10px;
-            background: var(--surface);
-            color: var(--muted);
-            font-size: .86rem;
-        }
-
-        .remote-cursor {
-            position: fixed;
-            left: 0;
-            top: 0;
-            width: 16px;
-            height: 16px;
-            border-radius: 999px;
-            border: 2px solid #ffffff;
-            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
-            z-index: 9999;
-            pointer-events: none;
-            transform: translate(-50%, -50%);
-            transition: left .05s linear, top .05s linear;
-        }
-
-        .remote-cursor::after {
-            content: '';
-            position: absolute;
-            width: 7px;
-            height: 7px;
-            border-radius: 999px;
-            background: #fff;
-            left: 50%;
-            top: 50%;
-            transform: translate(-50%, -50%);
-            opacity: .65;
-        }
-
-        .remote-cursor-label {
-            position: absolute;
-            top: 18px;
-            left: 10px;
-            background: rgba(17, 33, 58, 0.9);
-            color: #ffffff;
-            border-radius: 8px;
-            font-size: .72rem;
-            font-weight: 700;
-            padding: 3px 7px;
-            white-space: nowrap;
-        }
-
         @keyframes rise {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
@@ -939,56 +807,6 @@ $showAdminCursorMonitor = $sessionCanManageUsers && !$isAdminPreview;
                 <h1>Dashboard Operativa</h1>
                 <p>Panoramica professionale di accessi, funzionalita e dati operativi.</p>
             </header>
-
-            <?php if ($showCursorLiveSection): ?>
-                <section id="cursor-live" class="section cursor-section">
-                    <div class="section-head">
-                        <h3>Cursori Live Multiutente (MQTT)</h3>
-                        <span class="muted"><?= $isAdminPreview ? 'Vista anteprima utente: monitor cursori dedicato' : 'Canale condiviso in tempo reale' ?></span>
-                    </div>
-                    <div class="section-body">
-                        <div class="cursor-status">
-                            <span class="cursor-badge" id="mqttConnState">MQTT: in connessione...</span>
-                            <span class="cursor-badge" id="cursorUsersCount">Utenti visibili: 0</span>
-                            <span class="cursor-badge">Room: <?= htmlspecialchars($cursorRoom) ?></span>
-                        </div>
-                        <div class="cursor-stage">
-                            Muovi il mouse nella pagina per trasmettere la posizione agli altri utenti collegati alla dashboard.
-                        </div>
-                        <p class="section-note">
-                            Demo tecnica: usa un broker WebSocket locale su localhost:9001. In produzione conviene usare un broker privato autenticato.
-                        </p>
-                    </div>
-                </section>
-            <?php endif; ?>
-
-            <?php if ($showAdminCursorMonitor): ?>
-                <section id="admin-cursor-monitor" class="section cursor-section">
-                    <div class="section-head">
-                        <h3>📊 Admin Cursor Monitor</h3>
-                        <span class="muted">Panoramica di tutti i cursori connessi (visibile solo agli admin)</span>
-                    </div>
-                    <div class="section-body">
-                        <div class="cursor-status" style="margin-bottom: 12px;">
-                            <span class="cursor-badge" id="adminCursorCount">Cursori connessi: 0</span>
-                            <span class="cursor-badge" id="adminWSState">WebSocket: in connessione...</span>
-                        </div>
-                        <div id="adminCursorList" class="admin-cursor-list" style="
-                            display: grid;
-                            grid-gap: 8px;
-                            max-height: 300px;
-                            overflow-y: auto;
-                            padding: 8px;
-                            background: var(--surface, rgba(0,0,0,0.02));
-                            border-radius: 4px;
-                            border: 1px solid var(--line, rgba(0,0,0,0.1));
-                        "></div>
-                        <p class="section-note">
-                            I cursori appaiono qui indipendentemente dallo stato del toggle "Cursori Live". Sezione riservata ai moderatori.
-                        </p>
-                    </div>
-                </section>
-            <?php endif; ?>
 
             <section class="grid-stats">
                 <article class="card">
@@ -1191,20 +1009,6 @@ $showAdminCursorMonitor = $sessionCanManageUsers && !$isAdminPreview;
                             <?php endif; ?>
                         </div>
 
-                        <div class="action-row" style="margin-bottom:14px; padding-top: 14px; border-top: 1px solid var(--line);">
-                            <div class="status-dot <?= $cursorTrackingEnabled ? 'on' : 'off' ?>">
-                                Stato cursori live: <?= $cursorTrackingEnabled ? 'attivi' : 'disattivi' ?>
-                            </div>
-                            <form method="POST" class="action-row">
-                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
-                                <input type="hidden" name="action" value="toggle_cursor_tracking">
-                                <input type="hidden" name="cursor_tracking_enabled" value="<?= $cursorTrackingEnabled ? '0' : '1' ?>">
-                                <button type="submit" class="btn-action <?= $cursorTrackingEnabled ? 'danger' : 'primary' ?>">
-                                    <?= $cursorTrackingEnabled ? 'Disattiva cursori live' : 'Attiva cursori live' ?>
-                                </button>
-                            </form>
-                        </div>
-
                         <?php if (!empty($adminUsers)): ?>
                             <table>
                                 <thead>
@@ -1360,325 +1164,6 @@ $showAdminCursorMonitor = $sessionCanManageUsers && !$isAdminPreview;
             });
 
             syncLabel();
-
-            const mqttBadge = document.getElementById('mqttConnState');
-            const usersCountBadge = document.getElementById('cursorUsersCount');
-
-            // Admin sections
-            const adminCursorMonitor = document.getElementById('admin-cursor-monitor');
-            const adminCursorListContainer = document.getElementById('adminCursorList');
-            const adminCursorCount = document.getElementById('adminCursorCount');
-            const adminWSState = document.getElementById('adminWSState');
-            // Non uscire mai in anticipo: anche senza UI visibile alcuni utenti
-            // devono continuare a pubblicare il cursore per la vista admin.
-
-            const room = <?= json_encode($cursorRoom, JSON_UNESCAPED_SLASHES) ?>;
-            const selfClientId = <?= json_encode($cursorClientId, JSON_UNESCAPED_SLASHES) ?>;
-            const selfUser = {
-                id: <?= (int)$userId ?>,
-                username: <?= json_encode($username, JSON_UNESCAPED_UNICODE) ?>,
-                role: <?= json_encode($roleInfo['label'], JSON_UNESCAPED_UNICODE) ?>,
-            };
-            const sessionIsAdmin = <?= $sessionCanManageUsers ? 'true' : 'false' ?>;
-            const isAdminPreviewMode = <?= $isAdminPreview ? 'true' : 'false' ?>;
-            const publishAsAdminCursor = sessionIsAdmin && !isAdminPreviewMode;
-
-            const remotePointers = new Map();
-            const adminRemoteCursors = new Map(); // Separate tracking for admin monitor
-            let connected = false;
-            let lastSentAt = 0;
-            let ws = null;
-            let reconnectTimer = null;
-            const isAdmin = !!adminCursorMonitor; // True only when admin monitor section is present in this view
-            const cursorTrackingEnabled = <?= json_encode($cursorTrackingEnabled) ?>;
-            const canSeeUserCursors = cursorTrackingEnabled || isAdmin || isAdminPreviewMode;
-            const colorFromId = function (value) {
-                let hash = 0;
-                for (let i = 0; i < value.length; i += 1) {
-                    hash = (hash << 5) - hash + value.charCodeAt(i);
-                    hash |= 0;
-                }
-                const hue = Math.abs(hash) % 360;
-                return 'hsl(' + hue + ' 74% 48%)';
-            };
-
-            const updateConnectionBadge = function () {
-                const status = connected ? 'connesso @ ws://localhost:9001' : 'offline';
-                if (mqttBadge) {
-                    mqttBadge.textContent = 'MQTT: ' + status;
-                    mqttBadge.classList.toggle('ok', connected);
-                }
-                if (adminWSState) {
-                    adminWSState.textContent = 'WebSocket: ' + status;
-                    adminWSState.classList.toggle('ok', connected);
-                }
-            };
-
-            const updateUsersCount = function () {
-                if (usersCountBadge) {
-                    usersCountBadge.textContent = 'Utenti visibili: ' + remotePointers.size;
-                }
-            };
-
-            const updateAdminMonitor = function () {
-                if (!adminCursorListContainer ||!adminCursorCount) {
-                    return;
-                }
-
-                adminCursorCount.textContent = 'Cursori connessi: ' + adminRemoteCursors.size;
-
-                // Clear and rebuild list
-                adminCursorListContainer.innerHTML = '';
-
-                if (adminRemoteCursors.size === 0) {
-                    const emptyMsg = document.createElement('p');
-                    emptyMsg.style.cssText = 'color: var(--muted); text-align: center; padding: 16px 0; margin: 0;';
-                    emptyMsg.textContent = 'Nessun cursore connesso';
-                    adminCursorListContainer.appendChild(emptyMsg);
-                    return;
-                }
-
-                // Show each connected cursor
-                adminRemoteCursors.forEach(function (cursor, clientId) {
-                    const item = document.createElement('div');
-                    item.style.cssText = `
-                        display: flex;
-                        align-items: center;
-                        gap: 8px;
-                        padding: 8px;
-                        background: white;
-                        border-left: 3px solid ${cursor.color};
-                        border-radius: 2px;
-                    `;
-
-                    const dot = document.createElement('div');
-                    dot.style.cssText = `width: 8px; height: 8px; background: ${cursor.color}; border-radius: 50%;`;
-
-                    const info = document.createElement('div');
-                    info.style.cssText = 'flex: 1; font-size: 12px;';
-                    info.innerHTML = `
-                        <strong>${cursor.username}</strong>
-                        <div style="color: var(--muted); font-size: 11px;">
-                            Posizione: ${Math.round(cursor.x)}, ${Math.round(cursor.y)} | ${new Date(cursor.ts).toLocaleTimeString()}
-                        </div>
-                    `;
-
-                    const actions = document.createElement('div');
-                    if (cursor.userId > 0) {
-                        const openUserDashboard = document.createElement('a');
-                        openUserDashboard.href = 'dashboard.php?view_user=' + encodeURIComponent(String(cursor.userId));
-                        openUserDashboard.target = '_blank';
-                        openUserDashboard.rel = 'noopener';
-                        openUserDashboard.textContent = 'Apri dashboard';
-                        openUserDashboard.style.cssText = 'font-size: 11px; color: var(--brand); text-decoration: none; border: 1px solid var(--line); padding: 4px 8px; border-radius: 6px; white-space: nowrap;';
-                        actions.appendChild(openUserDashboard);
-                    }
-
-                    item.appendChild(dot);
-                    item.appendChild(info);
-                    item.appendChild(actions);
-                    adminCursorListContainer.appendChild(item);
-                });
-            };
-
-            const ensurePointer = function (peerId, label, color) {
-                const existing = remotePointers.get(peerId);
-                if (existing) {
-                    return existing;
-                }
-
-                const dot = document.createElement('div');
-                dot.className = 'remote-cursor';
-                dot.style.background = color;
-
-                const text = document.createElement('div');
-                text.className = 'remote-cursor-label';
-                text.textContent = label;
-                dot.appendChild(text);
-
-                document.body.appendChild(dot);
-                const entry = { element: dot, lastSeen: Date.now() };
-                remotePointers.set(peerId, entry);
-                updateUsersCount();
-                return entry;
-            };
-
-            const removePointer = function (peerId) {
-                const entry = remotePointers.get(peerId);
-                if (!entry) {
-                    return;
-                }
-                entry.element.remove();
-                remotePointers.delete(peerId);
-                updateUsersCount();
-            };
-
-            const scheduleReconnect = function () {
-                if (reconnectTimer !== null) {
-                    return;
-                }
-
-                reconnectTimer = window.setTimeout(function () {
-                    reconnectTimer = null;
-                    connectToServer();
-                }, 2000);
-            };
-
-            const connectToServer = function () {
-                if (connected && ws && ws.readyState === WebSocket.OPEN) {
-                    return;
-                }
-
-                if (ws) {
-                    try {
-                        ws.close();
-                    } catch (e) {
-                        // no-op
-                    }
-                }
-
-                if (mqttBadge) {
-                    mqttBadge.textContent = 'MQTT: connessione (ws://localhost:9001)...';
-                    mqttBadge.classList.remove('ok');
-                }
-
-                try {
-                    ws = new WebSocket('ws://localhost:9001');
-
-                    ws.onopen = function () {
-                        console.log('[Cursor] WebSocket connected');
-                        connected = true;
-                        updateConnectionBadge();
-
-                        // Join room
-                        ws.send(JSON.stringify({
-                            action: 'join',
-                            room: room
-                        }));
-                    };
-
-                    ws.onmessage = function (event) {
-                        try {
-                            const message = JSON.parse(event.data);
-
-                            if (message.type === 'cursor' && message.clientId !== selfClientId) {
-                                const peerId = String(message.clientId || '');
-                                const peerLabel = String(message.username || 'Utente');
-                                const peerColor = String(message.color || colorFromId(peerId));
-                                const peerUserId = Number.parseInt(String(message.userId || '0'), 10) || 0;
-                                
-                                    // Check if sender is admin
-                                    const senderIsAdmin = message.isAdmin === true;
-
-                                    // Regular cursor display (not for admin cursors shown to normal users)
-                                    if (!senderIsAdmin && canSeeUserCursors) {
-                                        const item = ensurePointer(peerId, peerLabel, peerColor);
-                                        item.element.style.left = message.x + 'px';
-                                        item.element.style.top = message.y + 'px';
-                                        item.lastSeen = Date.now();
-                                    }
-
-                                // Update admin monitor (always track all cursors)
-                                if (isAdmin) {
-                                    adminRemoteCursors.set(peerId, {
-                                        clientId: peerId,
-                                        userId: peerUserId,
-                                        username: peerLabel,
-                                        color: peerColor,
-                                        x: message.x,
-                                        y: message.y,
-                                        ts: message.ts || Date.now()
-                                    });
-                                    updateAdminMonitor();
-                                }
-                            }
-                        } catch (e) {
-                            // Ignore parse errors
-                        }
-                    };
-
-                    ws.onerror = function (err) {
-                        console.error('[Cursor] WebSocket error:', err);
-                        connected = false;
-                        if (mqttBadge) mqttBadge.textContent = 'MQTT: errore connessione';
-                        if (mqttBadge) mqttBadge.classList.remove('ok');
-                        if (adminWSState) adminWSState.textContent = 'WebSocket: errore connessione';
-                        if (adminWSState) adminWSState.classList.remove('ok');
-                        scheduleReconnect();
-                    };
-
-                    ws.onclose = function () {
-                        console.log('[Cursor] WebSocket closed');
-                        connected = false;
-                        updateConnectionBadge();
-                        scheduleReconnect();
-                    };
-                } catch (e) {
-                    console.error('[Cursor] Connection error:', e);
-                    connected = false;
-                    if (mqttBadge) mqttBadge.textContent = 'MQTT: offline';
-                    if (mqttBadge) mqttBadge.classList.remove('ok');
-                    if (adminWSState) adminWSState.textContent = 'WebSocket: offline';
-                    if (adminWSState) adminWSState.classList.remove('ok');
-                    scheduleReconnect();
-                }
-            };
-
-            const publishPointer = function (clientX, clientY) {
-                if (!connected || !ws || ws.readyState !== WebSocket.OPEN) {
-                    return;
-                }
-
-                const now = Date.now();
-                if (now - lastSentAt < 40) {
-                    return;
-                }
-                lastSentAt = now;
-
-                const payload = {
-                    action: 'cursor',
-                    clientId: selfClientId,
-                    userId: selfUser.id,
-                    username: selfUser.username,
-                    x: clientX,
-                    y: clientY,
-                    color: colorFromId(selfClientId),
-                    ts: now,
-                    isAdmin: publishAsAdminCursor
-                };
-
-                try {
-                    ws.send(JSON.stringify(payload));
-                } catch (e) {
-                    // Ignore send errors
-                }
-            };
-
-            window.addEventListener('mousemove', function (event) {
-                publishPointer(event.clientX, event.clientY);
-            }, { passive: true });
-
-            setInterval(function () {
-                const now = Date.now();
-                remotePointers.forEach(function (entry, peerId) {
-                    if (now - entry.lastSeen > 5000) {
-                        removePointer(peerId);
-                    }
-                });
-            }, 2000);
-
-            window.addEventListener('beforeunload', function () {
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({
-                        action: 'leave'
-                    }));
-                    ws.close();
-                }
-            });
-
-            connectToServer();
-            updateConnectionBadge();
-            updateUsersCount();
         })();
     </script>
 </body>
