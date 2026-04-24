@@ -5,6 +5,7 @@
 
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/jwt.php';
+require_once __DIR__ . '/tenant.php';
 
 const ACCESS_COOKIE_NAME = 'tma_access_token';
 const REFRESH_COOKIE_NAME = 'tma_refresh_token';
@@ -46,11 +47,12 @@ function clearAuthCookies(): void {
     ]);
 }
 
-function setAuthCookies(int $userId, string $username, string $role, string $refreshToken): void {
+function setAuthCookies(int $userId, string $username, string $role, string $refreshToken, int $tenantId = 0): void {
     $accessToken = jwtCreate([
         'sub' => $userId,
         'name' => $username,
         'role' => $role,
+        'tid'  => $tenantId,
     ]);
 
     setcookie(ACCESS_COOKIE_NAME, $accessToken, cookieOptions(JWT_ACCESS_TTL, true));
@@ -87,12 +89,22 @@ function getCurrentUser(): ?array {
         try {
             $rotated = refreshTokenRotate($refreshToken);
             $u = $rotated['user'];
-            setAuthCookies((int)$u['id'], (string)$u['username'], (string)$u['role'], (string)$rotated['new_refresh_token']);
+            $uTenantId = (int)$u['tenant_id'];
+
+            // Validate the refreshed user belongs to the current tenant.
+            $currentTenant = getCurrentTenant();
+            if ($currentTenant && $uTenantId !== (int)$currentTenant['id']) {
+                clearAuthCookies();
+                return null;
+            }
+
+            setAuthCookies((int)$u['id'], (string)$u['username'], (string)$u['role'], (string)$rotated['new_refresh_token'], $uTenantId);
 
             $payload = [
-                'sub' => (int)$u['id'],
+                'sub'  => (int)$u['id'],
                 'name' => (string)$u['username'],
                 'role' => (string)$u['role'],
+                'tid'  => $uTenantId,
             ];
         } catch (Throwable $e) {
             clearAuthCookies();
@@ -105,9 +117,18 @@ function getCurrentUser(): ?array {
     }
 
     $userId = (int)$payload['sub'];
+    $jwtTenantId = (int)($payload['tid'] ?? 0);
+
+    // Validate the JWT tenant matches the current request tenant.
+    $currentTenant = getCurrentTenant();
+    if ($currentTenant && $jwtTenantId > 0 && $jwtTenantId !== (int)$currentTenant['id']) {
+        clearAuthCookies();
+        return null;
+    }
+
     $pdo = getDB();
     $stmt = $pdo->prepare(
-        "SELECT u.id, u.username, u.email, u.is_active, r.name AS role_name
+        "SELECT u.id, u.username, u.email, u.is_active, u.tenant_id, r.name AS role_name
          FROM users u
          JOIN roles r ON u.role_id = r.id
          WHERE u.id = ?
@@ -121,11 +142,18 @@ function getCurrentUser(): ?array {
         return null;
     }
 
+    // Ensure the user belongs to the current tenant.
+    if ($currentTenant && (int)$row['tenant_id'] !== (int)$currentTenant['id']) {
+        clearAuthCookies();
+        return null;
+    }
+
     $cachedUser = [
-        'id' => (int)$row['id'],
-        'username' => (string)$row['username'],
-        'email' => (string)$row['email'],
-        'role' => (string)$row['role_name'],
+        'id'        => (int)$row['id'],
+        'username'  => (string)$row['username'],
+        'email'     => (string)$row['email'],
+        'role'      => (string)$row['role_name'],
+        'tenant_id' => (int)$row['tenant_id'],
         'permissions' => getUserPermissions((int)$row['id']),
     ];
 
@@ -191,15 +219,22 @@ function requirePermission(string $permission): array {
 function loginUser(string $email, string $password): array {
     $pdo = getDB();
     $identifier = trim($email);
+
+    $tenant = getCurrentTenant();
+    if (!$tenant) {
+        return ['success' => false, 'message' => 'Organizzazione non trovata o non attiva.'];
+    }
+    $tenantId = (int)$tenant['id'];
+
     $stmt = $pdo->prepare("
         SELECT u.id, u.username, u.email, u.password_hash, u.is_active,
                r.name AS role_name
         FROM users u
         JOIN roles r ON u.role_id = r.id
-        WHERE u.email = ? OR u.username = ?
+        WHERE (u.email = ? OR u.username = ?) AND u.tenant_id = ?
         LIMIT 1
     ");
-    $stmt->execute([$identifier, $identifier]);
+    $stmt->execute([$identifier, $identifier, $tenantId]);
     $user = $stmt->fetch();
 
     if (!$user) {
@@ -215,7 +250,7 @@ function loginUser(string $email, string $password): array {
     $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
     $ip = $_SERVER['REMOTE_ADDR'] ?? '';
     $refreshToken = refreshTokenCreate((int)$user['id'], (string)$ua, (string)$ip);
-    setAuthCookies((int)$user['id'], (string)$user['username'], (string)$user['role_name'], $refreshToken);
+    setAuthCookies((int)$user['id'], (string)$user['username'], (string)$user['role_name'], $refreshToken, $tenantId);
 
     return ['success' => true];
 }
@@ -223,6 +258,12 @@ function loginUser(string $email, string $password): array {
 // Registrazione nuovo utente (ruolo free di default)
 function registerUser(string $username, string $email, string $password): array {
     $pdo = getDB();
+
+    $tenant = getCurrentTenant();
+    if (!$tenant) {
+        return ['success' => false, 'message' => 'Organizzazione non trovata o non attiva.'];
+    }
+    $tenantId = (int)$tenant['id'];
 
     // Validazione
     $username = trim($username);
@@ -241,9 +282,9 @@ function registerUser(string $username, string $email, string $password): array 
         return ['success' => false, 'message' => 'La password deve contenere almeno una maiuscola e un numero.'];
     }
 
-    // Verifica unicità
-    $check = $pdo->prepare("SELECT id FROM users WHERE email = ? OR username = ? LIMIT 1");
-    $check->execute([$email, $username]);
+    // Verifica unicità all'interno del tenant
+    $check = $pdo->prepare("SELECT id FROM users WHERE (email = ? OR username = ?) AND tenant_id = ? LIMIT 1");
+    $check->execute([$email, $username, $tenantId]);
     if ($check->fetch()) {
         return ['success' => false, 'message' => 'Username o email già in uso.'];
     }
@@ -257,8 +298,8 @@ function registerUser(string $username, string $email, string $password): array 
         }
 
     $hash = password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]);
-    $ins  = $pdo->prepare("INSERT INTO users (username, email, password_hash, role_id) VALUES (?, ?, ?, ?)");
-    $ins->execute([$username, $email, $hash, $role['id']]);
+    $ins  = $pdo->prepare("INSERT INTO users (tenant_id, username, email, password_hash, role_id) VALUES (?, ?, ?, ?, ?)");
+    $ins->execute([$tenantId, $username, $email, $hash, $role['id']]);
 
         // Crea un portfolio principale se la tabella esiste (casi d'uso finance).
         $newUserId = (int) $pdo->lastInsertId();

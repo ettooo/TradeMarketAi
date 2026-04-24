@@ -6,6 +6,9 @@ if (isAuthenticated()) {
     exit;
 }
 
+$currentTenant = getCurrentTenant();
+$currentTenantName = $currentTenant ? (string)$currentTenant['name'] : 'TradeMarketAi';
+
 $error = '';
 $success = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -32,7 +35,7 @@ if (($_GET['registered'] ?? '') === '1') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login | TradeMarketAi Pro</title>
+    <title>Login | <?= htmlspecialchars($currentTenantName, ENT_QUOTES, 'UTF-8') ?></title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Fraunces:opsz,wght@9..144,600&display=swap');
 
@@ -257,7 +260,7 @@ if (($_GET['registered'] ?? '') === '1') {
     <button type="button" class="theme-toggle" id="themeToggle" aria-label="Attiva o disattiva tema scuro"></button>
     <div class="shell">
         <section class="panel">
-            <p class="brand">TradeMarketAi</p>
+            <p class="brand"><?= htmlspecialchars($currentTenantName, ENT_QUOTES, 'UTF-8') ?></p>
             <h1>Accesso Sicuro Con Gestione Ruoli E Permessi</h1>
             <p>Ambiente professionale per autenticazione, autorizzazioni granulari, API JWT e casi d'uso finance integrati.</p>
         </section>

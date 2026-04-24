@@ -5,8 +5,11 @@
 
 declare(strict_types=1);
 
+define('API_CONTEXT', true);
+
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/jwt.php';
+require_once __DIR__ . '/../config/tenant.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
@@ -107,7 +110,6 @@ function requireJwt(): array {
 
     try {
         $cachedPayload = jwtFromRequest();
-        return $cachedPayload;
     } catch (Throwable $e) {
         $msg = $e->getMessage();
 
@@ -117,11 +119,21 @@ function requireJwt(): array {
 
         respondError(401, 'Non autorizzato: token JWT non valido o scaduto.');
     }
+
+    // Validate tenant: the JWT's tid must match the current tenant.
+    $tenant = getCurrentTenant();
+    $jwtTenantId = (int)($cachedPayload['tid'] ?? 0);
+    if ($tenant !== null && $jwtTenantId > 0 && $jwtTenantId !== (int)$tenant['id']) {
+        respondError(401, 'Token JWT non valido per questo tenant.');
+    }
+
+    return $cachedPayload;
 }
 
 function isPublicRoute(string $method, string $uri): bool {
     return ($method === 'POST' && $uri === '/auth/login')
-        || ($method === 'POST' && $uri === '/auth/refresh');
+        || ($method === 'POST' && $uri === '/auth/refresh')
+        || ($method === 'GET'  && $uri === '/tenant');
 }
 
 function requireApiPermission(int $userId, string $permission): void {
@@ -148,15 +160,21 @@ if ($method === 'POST' && $uri === '/auth/login') {
         respondError(422, 'email e password sono obbligatori.');
     }
 
+    $tenant = getCurrentTenant();
+    if (!$tenant) {
+        respondError(404, 'Tenant non trovato o non attivo.');
+    }
+    $tenantId = (int)$tenant['id'];
+
     $pdo = getDB();
     $stmt = $pdo->prepare(
         "SELECT u.id, u.username, u.email, u.password_hash, u.is_active, r.name AS role
          FROM users u
          JOIN roles r ON u.role_id = r.id
-         WHERE u.email = ?
+         WHERE u.email = ? AND u.tenant_id = ?
          LIMIT 1"
     );
-    $stmt->execute([$email]);
+    $stmt->execute([$email, $tenantId]);
     $user = $stmt->fetch();
 
     if (!$user || !password_verify($password, $user['password_hash'])) {
@@ -168,9 +186,10 @@ if ($method === 'POST' && $uri === '/auth/login') {
 
     $permissions = getEffectivePermissionNames((int)$user['id']);
     $accessToken = jwtCreate([
-        'sub' => (int)$user['id'],
+        'sub'  => (int)$user['id'],
         'name' => $user['username'],
         'role' => $user['role'],
+        'tid'  => $tenantId,
     ]);
 
     $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
@@ -183,6 +202,7 @@ if ($method === 'POST' && $uri === '/auth/login') {
         'expires_in' => JWT_ACCESS_TTL,
         'access_token' => $accessToken,
         'refresh_token' => $refreshToken,
+        'tenant' => ['id' => $tenantId, 'slug' => $tenant['slug'], 'name' => $tenant['name']],
         'user' => [
             'id' => (int)$user['id'],
             'username' => $user['username'],
@@ -208,12 +228,21 @@ if ($method === 'POST' && $uri === '/auth/refresh') {
     }
 
     $u = $result['user'];
+    $uTenantId = (int)$u['tenant_id'];
+
+    // Validate tenant context.
+    $tenant = getCurrentTenant();
+    if ($tenant && $uTenantId !== (int)$tenant['id']) {
+        respondError(401, 'Refresh token non valido per questo tenant.');
+    }
+
     $permissions = getEffectivePermissionNames((int)$u['id']);
 
     $accessToken = jwtCreate([
-        'sub' => (int)$u['id'],
+        'sub'  => (int)$u['id'],
         'name' => $u['username'],
         'role' => $u['role'],
+        'tid'  => $uTenantId,
     ]);
 
     respondOk([
@@ -646,6 +675,180 @@ if ($method === 'DELETE' && preg_match('#^/alerts/(\d+)$#', $uri, $m)) {
     }
 
     respondOk(['message' => 'Alert eliminato.']);
+}
+
+// ─── TENANT ENDPOINTS ────────────────────────────────────────────────────────
+
+// GET /tenant — informazioni sul tenant corrente (pubblico)
+if ($method === 'GET' && $uri === '/tenant') {
+    $tenant = getCurrentTenant();
+    if (!$tenant) {
+        respondError(404, 'Tenant non trovato o non attivo.');
+    }
+
+    respondOk([
+        'tenant' => [
+            'id'   => $tenant['id'],
+            'slug' => $tenant['slug'],
+            'name' => $tenant['name'],
+            'plan' => $tenant['plan'],
+        ],
+    ]);
+}
+
+// GET /tenants — elenco di tutti i tenant (richiede manage_tenants)
+if ($method === 'GET' && $uri === '/tenants') {
+    $payload = requireJwt();
+    requireApiPermission((int)$payload['sub'], 'manage_tenants');
+
+    $pdo  = getDB();
+    $rows = $pdo->query('SELECT id, slug, name, plan, is_active, created_at FROM tenants ORDER BY created_at DESC')->fetchAll();
+
+    respondOk(['tenants' => $rows, 'total' => count($rows)]);
+}
+
+// POST /tenants — crea un nuovo tenant (richiede manage_tenants)
+if ($method === 'POST' && $uri === '/tenants') {
+    $payload = requireJwt();
+    requireApiPermission((int)$payload['sub'], 'manage_tenants');
+
+    $body = getBody();
+    $slug = strtolower(trim((string)($body['slug'] ?? '')));
+    $name = trim((string)($body['name'] ?? ''));
+    $plan = (string)($body['plan'] ?? 'basic');
+
+    if (!preg_match('/^[a-z0-9][a-z0-9\-]{1,61}[a-z0-9]$/', $slug)) {
+        respondError(422, 'slug non valido: usa solo lettere minuscole, cifre e trattini (3-63 chars).');
+    }
+    if (strlen($name) < 2 || strlen($name) > 100) {
+        respondError(422, 'name deve essere tra 2 e 100 caratteri.');
+    }
+    if (!in_array($plan, ['basic', 'professional', 'enterprise'], true)) {
+        respondError(422, "plan deve essere 'basic', 'professional' o 'enterprise'.");
+    }
+
+    $pdo = getDB();
+    try {
+        $pdo->prepare('INSERT INTO tenants (slug, name, plan) VALUES (?, ?, ?)')->execute([$slug, $name, $plan]);
+        $newId = (int)$pdo->lastInsertId();
+    } catch (PDOException $e) {
+        if ($e->getCode() === '23000') {
+            respondError(409, "Il tenant con slug '$slug' esiste già.");
+        }
+        respondError(500, 'Errore database.');
+    }
+
+    respondCreated([
+        'message' => 'Tenant creato.',
+        'tenant'  => ['id' => $newId, 'slug' => $slug, 'name' => $name, 'plan' => $plan, 'is_active' => true],
+    ]);
+}
+
+// GET /tenants/{id} — dettaglio tenant (richiede manage_tenants)
+if ($method === 'GET' && preg_match('#^/tenants/(\d+)$#', $uri, $m)) {
+    $payload = requireJwt();
+    requireApiPermission((int)$payload['sub'], 'manage_tenants');
+
+    $tenantId = (int)$m[1];
+    $pdo = getDB();
+    $stmt = $pdo->prepare('SELECT id, slug, name, plan, is_active, created_at FROM tenants WHERE id = ? LIMIT 1');
+    $stmt->execute([$tenantId]);
+    $row = $stmt->fetch();
+
+    if (!$row) {
+        respondError(404, 'Tenant non trovato.');
+    }
+
+    // Count users in tenant
+    $cntStmt = $pdo->prepare('SELECT COUNT(*) AS cnt FROM users WHERE tenant_id = ?');
+    $cntStmt->execute([$tenantId]);
+    $cntRow = $cntStmt->fetch();
+
+    respondOk(['tenant' => $row, 'user_count' => (int)($cntRow['cnt'] ?? 0)]);
+}
+
+// PUT /tenants/{id} — aggiorna tenant (richiede manage_tenants)
+if ($method === 'PUT' && preg_match('#^/tenants/(\d+)$#', $uri, $m)) {
+    $payload = requireJwt();
+    requireApiPermission((int)$payload['sub'], 'manage_tenants');
+
+    $tenantId = (int)$m[1];
+    $pdo  = getDB();
+    $stmt = $pdo->prepare('SELECT id, slug, name, plan, is_active FROM tenants WHERE id = ? LIMIT 1');
+    $stmt->execute([$tenantId]);
+    $row = $stmt->fetch();
+
+    if (!$row) {
+        respondError(404, 'Tenant non trovato.');
+    }
+
+    $body      = getBody();
+    $newName   = trim((string)($body['name']      ?? '')) ?: $row['name'];
+    $newPlan   = (string)($body['plan']      ?? '') ?: $row['plan'];
+    $newActive = isset($body['is_active']) ? ((bool)$body['is_active'] ? 1 : 0) : (int)$row['is_active'];
+
+    if (strlen($newName) < 2 || strlen($newName) > 100) {
+        respondError(422, 'name deve essere tra 2 e 100 caratteri.');
+    }
+    if (!in_array($newPlan, ['basic', 'professional', 'enterprise'], true)) {
+        respondError(422, "plan deve essere 'basic', 'professional' o 'enterprise'.");
+    }
+
+    $pdo->prepare('UPDATE tenants SET name = ?, plan = ?, is_active = ? WHERE id = ?')
+        ->execute([$newName, $newPlan, $newActive, $tenantId]);
+
+    respondOk([
+        'message' => 'Tenant aggiornato.',
+        'tenant'  => ['id' => $tenantId, 'slug' => $row['slug'], 'name' => $newName, 'plan' => $newPlan, 'is_active' => (bool)$newActive],
+    ]);
+}
+
+// DELETE /tenants/{id} — disattiva tenant (richiede manage_tenants; non elimina i dati)
+if ($method === 'DELETE' && preg_match('#^/tenants/(\d+)$#', $uri, $m)) {
+    $payload = requireJwt();
+    requireApiPermission((int)$payload['sub'], 'manage_tenants');
+
+    $tenantId = (int)$m[1];
+    if ($tenantId === 1) {
+        respondError(403, 'Il tenant predefinito non può essere disattivato.');
+    }
+
+    $pdo  = getDB();
+    $stmt = $pdo->prepare('SELECT id, slug FROM tenants WHERE id = ? LIMIT 1');
+    $stmt->execute([$tenantId]);
+    $row = $stmt->fetch();
+
+    if (!$row) {
+        respondError(404, 'Tenant non trovato.');
+    }
+
+    $pdo->prepare('UPDATE tenants SET is_active = 0 WHERE id = ?')->execute([$tenantId]);
+
+    respondOk(['message' => "Tenant '{$row['slug']}' disattivato."]);
+}
+
+// GET /tenant/users — utenti nel tenant corrente (richiede manage_users)
+if ($method === 'GET' && $uri === '/tenant/users') {
+    $payload  = requireJwt();
+    $callerId = (int)$payload['sub'];
+    requireApiPermission($callerId, 'manage_users');
+
+    $tenant = getCurrentTenant();
+    if (!$tenant) {
+        respondError(404, 'Tenant non trovato.');
+    }
+
+    $pdo  = getDB();
+    $stmt = $pdo->prepare(
+        "SELECT u.id, u.username, u.email, r.name AS role, u.is_active, u.created_at
+         FROM users u
+         JOIN roles r ON u.role_id = r.id
+         WHERE u.tenant_id = ?
+         ORDER BY u.created_at DESC"
+    );
+    $stmt->execute([(int)$tenant['id']]);
+
+    respondOk(['users' => $stmt->fetchAll(), 'tenant' => ['id' => $tenant['id'], 'slug' => $tenant['slug']]]);
 }
 
 respondError(404, "Endpoint non trovato: $method $uri");

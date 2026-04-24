@@ -6,6 +6,10 @@ $username = $user['username'];
 $email = $user['email'];
 $role = $user['role'];
 $userId = (int)$user['id'];
+$userTenantId = (int)($user['tenant_id'] ?? 0);
+
+$currentTenant = getCurrentTenant();
+$currentTenantName = $currentTenant ? (string)$currentTenant['name'] : 'TradeMarketAi';
 
 $success = '';
 $error = '';
@@ -20,11 +24,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && can('edit_profile')) {
             $error = 'Username non valido (3-50 caratteri).';
         } else {
             $pdo = getDB();
-            $check = $pdo->prepare('SELECT id FROM users WHERE username = ? AND id != ?');
-            $check->execute([$newUsername, $userId]);
+            // Verifica unicità dello username all'interno del tenant corrente
+            $check = $pdo->prepare('SELECT id FROM users WHERE username = ? AND id != ? AND tenant_id = ?');
+            $check->execute([$newUsername, $userId, $userTenantId]);
 
             if ($check->fetch()) {
-                $error = 'Username gia in uso.';
+                $error = 'Username già in uso.';
             } else {
                 $upd = $pdo->prepare('UPDATE users SET username = ? WHERE id = ?');
                 $upd->execute([$newUsername, $userId]);
@@ -42,7 +47,7 @@ $csrfToken = getCsrfToken();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Profilo | TradeMarketAi Pro</title>
+    <title>Profilo | <?= htmlspecialchars($currentTenantName, ENT_QUOTES, 'UTF-8') ?></title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Fraunces:opsz,wght@9..144,600&display=swap');
 
