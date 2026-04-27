@@ -106,7 +106,8 @@ INSERT INTO `permissions` (`id`, `name`, `description`, `created_at`) VALUES
 (16, 'set_basic_alerts', 'Alert su soglie di prezzo (Free)', '2026-03-12 22:09:12'),
 (17, 'set_advanced_alerts', 'Alert avanzati e segnali AI (Premium)', '2026-03-12 22:09:12'),
 (18, 'manage_portfolio', 'Gestione portafoglio virtuale', '2026-03-12 22:09:12'),
-(19, 'manage_multi_portfolio', 'Portafogli multipli (Premium)', '2026-03-12 22:09:12');
+(19, 'manage_multi_portfolio', 'Portafogli multipli (Premium)', '2026-03-12 22:09:12'),
+(20, 'manage_tenants', 'Creazione e gestione dei tenant della piattaforma (super_admin)', '2026-03-12 22:09:12');
 
 -- --------------------------------------------------------
 
@@ -180,7 +181,8 @@ CREATE TABLE `roles` (
 INSERT INTO `roles` (`id`, `name`, `description`, `created_at`) VALUES
 (1, 'free', 'Utente con accesso base gratuito', '2026-02-26 18:28:34'),
 (2, 'premium', 'Utente con accesso completo premium', '2026-02-26 18:28:34'),
-(3, 'admin', 'Amministratore del sistema', '2026-02-26 18:28:34');
+(3, 'admin', 'Amministratore del tenant', '2026-02-26 18:28:34'),
+(4, 'super_admin', 'Super Amministratore della piattaforma (cross-tenant)', '2026-02-26 18:28:34');
 
 -- --------------------------------------------------------
 
@@ -237,7 +239,27 @@ INSERT INTO `role_permissions` (`role_id`, `permission_id`) VALUES
 (3, 16),
 (3, 17),
 (3, 18),
-(3, 19);
+(3, 19),
+(4, 1),
+(4, 2),
+(4, 3),
+(4, 4),
+(4, 5),
+(4, 6),
+(4, 7),
+(4, 8),
+(4, 9),
+(4, 10),
+(4, 11),
+(4, 12),
+(4, 13),
+(4, 14),
+(4, 15),
+(4, 16),
+(4, 17),
+(4, 18),
+(4, 19),
+(4, 20);
 
 -- --------------------------------------------------------
 
@@ -255,11 +277,34 @@ CREATE TABLE `stocks` (
 -- --------------------------------------------------------
 
 --
+-- Struttura della tabella `tenants`
+--
+
+CREATE TABLE `tenants` (
+  `id` int(11) NOT NULL,
+  `slug` varchar(63) NOT NULL COMMENT 'Identificatore URL-safe (es. sottodominio)',
+  `name` varchar(100) NOT NULL,
+  `plan` enum('basic','professional','enterprise') NOT NULL DEFAULT 'basic',
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dump dei dati per la tabella `tenants`
+--
+
+INSERT INTO `tenants` (`id`, `slug`, `name`, `plan`, `is_active`) VALUES
+(1, 'default', 'Default Organization', 'enterprise', 1);
+
+-- --------------------------------------------------------
+
+--
 -- Struttura della tabella `users`
 --
 
 CREATE TABLE `users` (
   `id` int(11) NOT NULL,
+  `tenant_id` int(11) NOT NULL DEFAULT 1,
   `username` varchar(50) NOT NULL,
   `email` varchar(150) NOT NULL,
   `password_hash` varchar(255) NOT NULL,
@@ -310,11 +355,11 @@ CREATE TABLE `subscription_transactions` (
 -- Dump dei dati per la tabella `users`
 --
 
-INSERT INTO `users` (`id`, `username`, `email`, `password_hash`, `role_id`, `is_active`, `created_at`, `updated_at`) VALUES
-(1, 'admin', 'admin@example.com', '$2y$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 3, 1, '2026-02-26 18:28:34', '2026-02-26 18:28:34'),
-(2, 'gatto@gmail.com', 'gatto@gmail.com', '$2y$12$7JkKXjZcG1V6CnZAZ/g3ce/vBSpKcKhmzY5IpWBX/dPWC9wJ.s.o6', 1, 1, '2026-02-26 18:50:27', '2026-02-26 18:50:27'),
-(3, 'banano@gmail.com', 'banano@gmail.com', '$2y$12$u9qvhWVM2z3bKZfIjUhyh.HPFM7VmkOlxpYg/wpWeKP.3D88HJyHy', 1, 1, '2026-02-26 18:52:43', '2026-02-26 18:52:43'),
-(4, 'criceto', 'criceto@criceto.com', '$2y$12$b3Pl7rfPhWq7X9SDghIzdOgIhLDpiMl41Bd4IV4oxAFOj78MwwYmO', 1, 1, '2026-03-12 21:54:45', '2026-03-12 21:54:45');
+INSERT INTO `users` (`id`, `tenant_id`, `username`, `email`, `password_hash`, `role_id`, `is_active`, `created_at`, `updated_at`) VALUES
+(1, 1, 'admin', 'admin@example.com', '$2y$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 3, 1, '2026-02-26 18:28:34', '2026-02-26 18:28:34'),
+(2, 1, 'gatto@gmail.com', 'gatto@gmail.com', '$2y$12$7JkKXjZcG1V6CnZAZ/g3ce/vBSpKcKhmzY5IpWBX/dPWC9wJ.s.o6', 1, 1, '2026-02-26 18:50:27', '2026-02-26 18:50:27'),
+(3, 1, 'banano@gmail.com', 'banano@gmail.com', '$2y$12$u9qvhWVM2z3bKZfIjUhyh.HPFM7VmkOlxpYg/wpWeKP.3D88HJyHy', 1, 1, '2026-02-26 18:52:43', '2026-02-26 18:52:43'),
+(4, 1, 'criceto', 'criceto@criceto.com', '$2y$12$b3Pl7rfPhWq7X9SDghIzdOgIhLDpiMl41Bd4IV4oxAFOj78MwwYmO', 1, 1, '2026-03-12 21:54:45', '2026-03-12 21:54:45');
 
 -- --------------------------------------------------------
 
@@ -401,7 +446,7 @@ CREATE TABLE `view_user_access_control` (
 --
 DROP TABLE IF EXISTS `view_active_sessions`;
 
-CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `view_active_sessions`  AS SELECT `u`.`username` AS `username`, `rt`.`ip_address` AS `ip_address`, `rt`.`user_agent` AS `user_agent`, `rt`.`expires_at` AS `expires_at`, `rt`.`created_at` AS `login_time` FROM (`refresh_tokens` `rt` join `users` `u` on(`rt`.`user_id` = `u`.`id`)) WHERE `rt`.`revoked` = 0 AND `rt`.`expires_at` > current_timestamp() ;
+CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `view_active_sessions`  AS SELECT `u`.`tenant_id` AS `tenant_id`, `u`.`username` AS `username`, `rt`.`ip_address` AS `ip_address`, `rt`.`user_agent` AS `user_agent`, `rt`.`expires_at` AS `expires_at`, `rt`.`created_at` AS `login_time` FROM (`refresh_tokens` `rt` join `users` `u` on(`rt`.`user_id` = `u`.`id`)) WHERE `rt`.`revoked` = 0 AND `rt`.`expires_at` > current_timestamp() ;
 
 -- --------------------------------------------------------
 
@@ -428,7 +473,7 @@ CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW 
 --
 DROP TABLE IF EXISTS `view_user_access_control`;
 
-CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `view_user_access_control`  AS SELECT `u`.`id` AS `user_id`, `u`.`username` AS `username`, `u`.`email` AS `email`, `r`.`name` AS `role_name`, `p`.`name` AS `permission_name`, `p`.`description` AS `permission_info` FROM (((`users` `u` join `roles` `r` on(`u`.`role_id` = `r`.`id`)) join `role_permissions` `rp` on(`r`.`id` = `rp`.`role_id`)) join `permissions` `p` on(`rp`.`permission_id` = `p`.`id`)) WHERE `u`.`is_active` = 1 ;
+CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `view_user_access_control`  AS SELECT `u`.`tenant_id` AS `tenant_id`, `u`.`id` AS `user_id`, `u`.`username` AS `username`, `u`.`email` AS `email`, `r`.`name` AS `role_name`, `p`.`name` AS `permission_name`, `p`.`description` AS `permission_info` FROM (((`users` `u` join `roles` `r` on(`u`.`role_id` = `r`.`id`)) join `role_permissions` `rp` on(`r`.`id` = `rp`.`role_id`)) join `permissions` `p` on(`rp`.`permission_id` = `p`.`id`)) WHERE `u`.`is_active` = 1 ;
 
 --
 -- Indici per le tabelle scaricate
@@ -509,12 +554,20 @@ ALTER TABLE `stocks`
   ADD UNIQUE KEY `symbol` (`symbol`);
 
 --
+-- Indici per le tabelle `tenants`
+--
+ALTER TABLE `tenants`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `slug` (`slug`);
+
+--
 -- Indici per le tabelle `users`
 --
 ALTER TABLE `users`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `username` (`username`),
-  ADD UNIQUE KEY `email` (`email`),
+  ADD UNIQUE KEY `unique_username_per_tenant` (`tenant_id`,`username`),
+  ADD UNIQUE KEY `unique_email_per_tenant` (`tenant_id`,`email`),
+  ADD KEY `idx_users_tenant_id` (`tenant_id`),
   ADD KEY `role_id` (`role_id`);
 
 --
@@ -541,6 +594,12 @@ ALTER TABLE `alerts`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT per la tabella `tenants`
+--
+ALTER TABLE `tenants`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
 -- AUTO_INCREMENT per la tabella `market_data`
 --
 ALTER TABLE `market_data`
@@ -550,7 +609,7 @@ ALTER TABLE `market_data`
 -- AUTO_INCREMENT per la tabella `permissions`
 --
 ALTER TABLE `permissions`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=21;
 
 --
 -- AUTO_INCREMENT per la tabella `portfolios`
@@ -574,7 +633,7 @@ ALTER TABLE `refresh_tokens`
 -- AUTO_INCREMENT per la tabella `roles`
 --
 ALTER TABLE `roles`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT per la tabella `subscription_transactions`
@@ -641,7 +700,8 @@ ALTER TABLE `subscription_transactions`
 -- Limiti per la tabella `users`
 --
 ALTER TABLE `users`
-  ADD CONSTRAINT `users_ibfk_1` FOREIGN KEY (`role_id`) REFERENCES `roles` (`id`);
+  ADD CONSTRAINT `users_ibfk_1` FOREIGN KEY (`role_id`) REFERENCES `roles` (`id`),
+  ADD CONSTRAINT `fk_users_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`);
 
 --
 -- Limiti per la tabella `user_permissions`

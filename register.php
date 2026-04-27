@@ -6,6 +6,9 @@ if (isAuthenticated()) {
     exit;
 }
 
+$currentTenant = getCurrentTenant();
+$currentTenantName = $currentTenant ? (string)$currentTenant['name'] : 'TradeMarketAi';
+
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -34,7 +37,7 @@ $csrfToken = getCsrfToken();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Registrazione | TradeMarketAi Pro</title>
+    <title>Registrazione | <?= htmlspecialchars($currentTenantName, ENT_QUOTES, 'UTF-8') ?></title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Fraunces:opsz,wght@9..144,600&display=swap');
 
@@ -275,7 +278,7 @@ $csrfToken = getCsrfToken();
         </section>
 
         <section class="panel">
-            <p class="brand">TradeMarketAi</p>
+            <p class="brand"><?= htmlspecialchars($currentTenantName, ENT_QUOTES, 'UTF-8') ?></p>
             <h1>Piattaforma Pronta Per Ruoli, API JWT E Moduli Finance</h1>
             <p>Il tuo account parte dal piano Free con accesso ai contenuti base, profilo e strumenti iniziali di portfolio e alert.</p>
         </section>

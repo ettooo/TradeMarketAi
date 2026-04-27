@@ -5,6 +5,10 @@ $sessionUserId = (int)($sessionUser['id'] ?? 0);
 $sessionPerms = $sessionUser['permissions'] ?? [];
 $sessionCanManageUsers = in_array('manage_users', $sessionPerms, true);
 
+$currentTenant = getCurrentTenant();
+$currentTenantId = $currentTenant ? (int)$currentTenant['id'] : 0;
+$currentTenantName = $currentTenant ? (string)$currentTenant['name'] : 'TradeMarketAi';
+
 $user = $sessionUser;
 $isAdminPreview = false;
 $previewUserId = (int)($_GET['view_user'] ?? 0);
@@ -17,10 +21,10 @@ if ($previewUserId > 0 && $sessionCanManageUsers && $previewUserId !== $sessionU
             "SELECT u.id, u.username, u.email, u.is_active, r.name AS role_name
              FROM users u
              JOIN roles r ON r.id = u.role_id
-             WHERE u.id = ?
+             WHERE u.id = ? AND u.tenant_id = ?
              LIMIT 1"
         );
-        $previewStmt->execute([$previewUserId]);
+        $previewStmt->execute([$previewUserId, $currentTenantId]);
         $previewRow = $previewStmt->fetch();
 
         if ($previewRow && (int)$previewRow['is_active'] === 1) {
@@ -267,42 +271,55 @@ try {
     }
 
     if ($has('manage_users')) {
-        $adminUsers = $pdo->query(
+        $adminUsersStmt = $pdo->prepare(
             "SELECT u.id, u.username, u.email, r.name AS role, u.is_active, u.created_at
              FROM users u
              JOIN roles r ON u.role_id = r.id
+             WHERE u.tenant_id = ?
              ORDER BY u.created_at DESC
              LIMIT 12"
-        )->fetchAll();
+        );
+        $adminUsersStmt->execute([$currentTenantId]);
+        $adminUsers = $adminUsersStmt->fetchAll();
 
         // Uso esplicito vista SQL: monitor sessioni attive con refresh token validi.
         try {
-            $activeSessionsRows = $pdo->query(
-                'SELECT username, ip_address, user_agent, expires_at, login_time FROM view_active_sessions ORDER BY login_time DESC LIMIT 8'
-            )->fetchAll();
+            $sessStmt = $pdo->prepare(
+                'SELECT username, ip_address, user_agent, expires_at, login_time
+                 FROM view_active_sessions
+                 WHERE tenant_id = ?
+                 ORDER BY login_time DESC LIMIT 8'
+            );
+            $sessStmt->execute([$currentTenantId]);
+            $activeSessionsRows = $sessStmt->fetchAll();
         } catch (Throwable $e) {
             $activeSessionsRows = [];
         }
     }
 
     if ($has('view_reports')) {
-        $roleStats = $pdo->query(
+        $roleStatsStmt = $pdo->prepare(
             "SELECT r.name, COUNT(u.id) AS cnt
              FROM roles r
-             LEFT JOIN users u ON r.id = u.role_id
+             LEFT JOIN users u ON r.id = u.role_id AND u.tenant_id = ?
              GROUP BY r.id, r.name
              ORDER BY r.id"
-        )->fetchAll();
+        );
+        $roleStatsStmt->execute([$currentTenantId]);
+        $roleStats = $roleStatsStmt->fetchAll();
 
         // Uso esplicito vista SQL: matrice accessi utenti/ruoli/permessi.
         try {
-            $viewAccessRows = $pdo->query(
+            $viewAccessStmt = $pdo->prepare(
                 "SELECT user_id, username, email, role_name, COUNT(permission_name) AS permissions_count
                  FROM view_user_access_control
+                 WHERE tenant_id = ?
                  GROUP BY user_id, username, email, role_name
                  ORDER BY permissions_count DESC, username ASC
                  LIMIT 12"
-            )->fetchAll();
+            );
+            $viewAccessStmt->execute([$currentTenantId]);
+            $viewAccessRows = $viewAccessStmt->fetchAll();
         } catch (Throwable $e) {
             $viewAccessRows = [];
         }
@@ -319,7 +336,7 @@ $csrfToken = getCsrfToken();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard | TradeMarketAi Pro</title>
+    <title>Dashboard | <?= htmlspecialchars($currentTenantName, ENT_QUOTES, 'UTF-8') ?></title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Fraunces:opsz,wght@9..144,600&display=swap');
 
@@ -762,7 +779,7 @@ $csrfToken = getCsrfToken();
     <button type="button" class="theme-toggle" id="themeToggle" aria-label="Attiva o disattiva tema scuro"></button>
     <div class="layout">
         <aside class="sidebar">
-            <h2 class="brand">TradeMarketAi</h2>
+            <h2 class="brand"><?= htmlspecialchars($currentTenantName, ENT_QUOTES, 'UTF-8') ?></h2>
 
             <div class="nav">
                 <p class="nav-title">Navigazione</p>

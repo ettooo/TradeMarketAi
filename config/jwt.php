@@ -129,7 +129,7 @@ function refreshTokenRotate(string $plainToken): array {
 
     $stmt = $pdo->prepare("
         SELECT rt.id, rt.user_id, rt.expires_at, rt.revoked,
-               u.username, u.email, u.is_active, r.name AS role_name
+               u.username, u.email, u.is_active, u.tenant_id, r.name AS role_name
         FROM refresh_tokens rt
         JOIN users u ON rt.user_id = u.id
         JOIN roles  r ON u.role_id  = r.id
@@ -166,10 +166,11 @@ function refreshTokenRotate(string $plainToken): array {
 
     return [
         'user' => [
-            'id'       => (int) $row['user_id'],
-            'username' => $row['username'],
-            'email'    => $row['email'],
-            'role'     => $row['role_name'],
+            'id'        => (int) $row['user_id'],
+            'username'  => $row['username'],
+            'email'     => $row['email'],
+            'role'      => $row['role_name'],
+            'tenant_id' => (int) $row['tenant_id'],
         ],
         'new_refresh_token' => $newRefresh,
     ];
