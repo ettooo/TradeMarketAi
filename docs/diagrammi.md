@@ -35,20 +35,18 @@
 - se l'utente non è più Free, l'operazione viene rifiutata;
 - se manca la configurazione necessaria nel database, il sistema segnala un errore di configurazione.
 
-## Diagramma delle classi
+# TradeMarketAi - Diagramma delle Classi
 
-> Nota: il progetto è implementato in stile procedurale PHP, quindi questo diagramma rappresenta il modello logico del dominio e i moduli di servizio corrispondenti.
+Di seguito è riportato il diagramma delle classi (modello logico e strutturale) del progetto, che include esclusivamente le entità di dominio (tabelle del database) e i moduli applicativi principali (script e librerie procedurali del progetto), omettendo classi esterne e dipendenze.
 
 ```mermaid
 classDiagram
-direction LR
+direction TB
 
 %% =========================
-%% AUTH DOMAIN
+%% DOMINIO / ENTITÀ (Database)
 %% =========================
-
-namespace Auth {
-
+namespace DatabaseEntities {
     class User {
         +int id
         +string username
@@ -56,6 +54,7 @@ namespace Auth {
         +string password_hash
         +int role_id
         +bool is_active
+        +datetime created_at
     }
 
     class Role {
@@ -74,31 +73,16 @@ namespace Auth {
         +int id
         +int user_id
         +string token_hash
+        +datetime created_at
         +datetime expires_at
         +bool revoked
     }
-
-    class RolePermission {
-        +int role_id
-        +int permission_id
-    }
-
-    class UserPermission {
-        +int user_id
-        +int permission_id
-    }
-}
-
-%% =========================
-%% PORTFOLIO DOMAIN
-%% =========================
-
-namespace PortfolioDomain {
 
     class Portfolio {
         +int id
         +int user_id
         +string name
+        +datetime created_at
     }
 
     class PortfolioItem {
@@ -107,14 +91,8 @@ namespace PortfolioDomain {
         +string symbol
         +int quantity
         +decimal purchase_price
+        +datetime purchased_at
     }
-}
-
-%% =========================
-%% MONITORING DOMAIN
-%% =========================
-
-namespace Monitoring {
 
     class Alert {
         +int id
@@ -123,14 +101,8 @@ namespace Monitoring {
         +string condition_type
         +decimal threshold
         +bool is_active
+        +datetime created_at
     }
-}
-
-%% =========================
-%% MARKET DOMAIN
-%% =========================
-
-namespace Market {
 
     class MarketData {
         +int id
@@ -140,163 +112,99 @@ namespace Market {
         +decimal change_pct
         +int volume
         +int market_cap
+        +datetime fetched_at
     }
 }
 
 %% =========================
-%% TRANSACTIONS DOMAIN
+%% CORE / CONFIG
 %% =========================
+namespace ConfigCore {
+    class DBConfig {
+        <<module>>
+        +getDB() PDO
+    }
 
-namespace Transactions {
-
-    class SubscriptionTransaction {
-        +int id
-        +int user_id
-        +int from_role_id
-        +int to_role_id
-        +string status
-        +datetime transaction_date
+    class JWTConfig {
+        <<module>>
+        +jwtCreate(payload: array) string
+        +jwtVerify(token: string) array
+        +jwtFromRequest() array
+        +refreshTokenCreate(user_id: int) string
+        +refreshTokenRotate(token: string) array
+        +refreshTokenRevoke(token: string) void
     }
 }
 
 %% =========================
-%% CONFIG DOMAIN
+%% API E ROUTER
 %% =========================
-
-namespace Config {
-
-    class SystemSetting {
-        +string setting_key
-        +string setting_value
+namespace APILayer {
+    class ApiRouter {
+        <<controller>>
+        +respond(code: int, data: array)
+        +getBody() array
+        +normalizeApiPath(uri: string) string
+        +getEffectivePermissionNames(user_id: int) array
+        +requireJwt() array
+        +requireApiPermission(user_id: int, permission: string)
     }
 }
 
 %% =========================
-%% SERVICES LAYER
+%% VIEW / FRONT CONTROLLERS
 %% =========================
-
-namespace Services {
-
-    class AuthService {
-        +registerUser()
-        +loginUser()
-        +logoutUser()
-        +getCurrentUser()
-        +can()
+namespace Views {
+    class LoginPHP {
+        <<page>>
+        +renderLoginForm()
     }
 
-    class JwtService {
-        +jwtCreate()
-        +jwtVerify()
-        +refreshTokenCreate()
-        +refreshTokenRotate()
-        +refreshTokenRevoke()
+    class DashboardPHP {
+        <<page>>
+        +renderDashboard()
+        +displayMarket()
+        +displayPortfolio()
     }
 
-    class PermissionService {
-        +hasRolePermission()
-        +hasUserPermission()
+    class ProfilePHP {
+        <<page>>
+        +renderProfile()
     }
-
-    class PortfolioService {
-        +getPortfolioValue()
-        +addItem()
-        +removeItem()
-    }
-
-    class AlertService {
-        +createAlert()
-        +disableAlert()
-        +checkAlerts()
-    }
-
-    class MarketDataService {
-        +fetchMarketData()
-        +getMarketDataBySymbol()
-    }
-
-    class SubscriptionService {
-        +upgradeToPremium()
-        +validateTransaction()
-    }
-
-    class DashboardController <<boundary>> {
-        +renderMarket()
-        +renderPortfolio()
-        +renderAlerts()
-        +renderAdminPanel()
+    
+    class LogoutPHP {
+        <<page>>
+        +executeLogout()
     }
 }
 
 %% =========================
-%% RELAZIONI AUTH (CORRETTE UML)
+%% RELAZIONI
 %% =========================
 
-User "*" --> "1" Role : belongs_to
+User "1" -- "*" RefreshToken : ha
+User "*" -- "1" Role : appartiene_a
+User "1" -- "*" Portfolio : possiede
+User "1" -- "*" Alert : imposta
 
-User "1" --> "*" RefreshToken : owns
+Role "*" -- "*" Permission : possiede (role_permissions)
+User "*" -- "*" Permission : possiede (user_permissions)
 
-Role "1" --> "*" RolePermission
-Permission "1" --> "*" RolePermission
+Portfolio "1" -- "*" PortfolioItem : contiene
 
-User "1" --> "*" UserPermission
-Permission "1" --> "*" UserPermission
+PortfolioItem "*" ..> "1" MarketData : fa_riferimento (symbol)
+Alert "*" ..> "1" MarketData : fa_riferimento (symbol)
 
-%% =========================
-%% PORTFOLIO RELATIONS
-%% =========================
+ApiRouter ..> DBConfig : usa
+ApiRouter ..> JWTConfig : usa
+ApiRouter ..> User : gestisce
+ApiRouter ..> Permission : verifica
+ApiRouter ..> Portfolio : gestisce
+ApiRouter ..> Alert : gestisce
 
-User "1" --> "*" Portfolio : owns
-Portfolio "1" --> "*" PortfolioItem : contains
+LoginPHP ..> ApiRouter : chiama
+DashboardPHP ..> ApiRouter : chiama
+ProfilePHP ..> ApiRouter : chiama
+LogoutPHP ..> ApiRouter : chiama
 
-%% =========================
-%% MONITORING RELATIONS
-%% =========================
-
-User "1" --> "*" Alert : creates
-
-%% =========================
-%% MARKET RELATIONS
-%% =========================
-
-PortfolioItem "*" ..> "1" MarketData : symbol
-Alert "*" ..> "1" MarketData : symbol
-
-%% =========================
-%% TRANSACTIONS
-%% =========================
-
-User "1" --> "*" SubscriptionTransaction : performs
-
-%% =========================
-%% SERVICE DEPENDENCIES
-%% =========================
-
-AuthService ..> User
-AuthService ..> Role
-AuthService ..> Permission
-AuthService ..> JwtService
-
-JwtService ..> RefreshToken
-
-PermissionService ..> RolePermission
-PermissionService ..> UserPermission
-
-PortfolioService ..> Portfolio
-PortfolioService ..> PortfolioItem
-PortfolioService ..> MarketData
-
-AlertService ..> Alert
-AlertService ..> MarketData
-
-MarketDataService ..> MarketData
-
-SubscriptionService ..> SubscriptionTransaction
-SubscriptionService ..> SystemSetting
-
-DashboardController ..> AuthService
-DashboardController ..> PortfolioService
-DashboardController ..> AlertService
-DashboardController ..> MarketDataService
-DashboardController ..> PermissionService
 ```
