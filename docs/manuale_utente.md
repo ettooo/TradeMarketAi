@@ -30,6 +30,12 @@ La dashboard è la schermata centrale dell'applicazione. Da qui puoi:
 - **Alert**: mostra gli alert già configurati sul tuo account.
 - **Amministrazione**: visibile solo agli amministratori con i permessi adeguati.
 
+## Stato implementazione
+
+Le sezioni Registrazione/Login, Profilo, Mercato, Portafoglio, Alert e Amministrazione base sono già operative.
+
+Le funzioni Premium di analisi predittiva AI e simulazioni probabilistiche sono previste dal progetto e dai diagrammi, ma nel codice attuale restano ancora TODO: la dashboard espone i permessi corrispondenti, ma non offre ancora un pannello operativo dedicato.
+
 ## Profilo
 
 La pagina profilo permette di consultare email e ruolo, e di cambiare username se il tuo account ha il permesso `edit_profile`.

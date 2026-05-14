@@ -858,6 +858,8 @@ $csrfToken = getCsrfToken();
             <section class="section">
                 <div class="section-head"><h3>Permessi Effettivi</h3></div>
                 <div class="section-body">
+                    <!-- TODO: aggiungere pannelli operativi dedicati per view_ai_analysis e run_simulation.
+                         Al momento questi permessi sono solo predisposti nello schema e nei diagrammi. -->
                     <div class="chip-wrap">
                         <?php
                         $allPerms = [
