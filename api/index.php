@@ -649,3 +649,5 @@ if ($method === 'DELETE' && preg_match('#^/alerts/(\d+)$#', $uri, $m)) {
 }
 
 respondError(404, "Endpoint non trovato: $method $uri");
+// TODO: Implement API endpoints for AI predictive analysis (view_ai_analysis) and probabilistic simulations (run_simulation).
+// TODO: Implement API endpoints for Forum and External Broker integration.
