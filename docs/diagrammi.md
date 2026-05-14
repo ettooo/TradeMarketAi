@@ -35,7 +35,7 @@
 - se l'utente non è più Free, l'operazione viene rifiutata;
 - se manca la configurazione necessaria nel database, il sistema segnala un errore di configurazione.
 
-# TradeMarketAi - Diagramma delle Classi
+# Diagramma delle Classi
 
 Di seguito è riportato il diagramma delle classi (modello logico e strutturale) del progetto, che include esclusivamente le entità di dominio (tabelle del database) e i moduli applicativi principali (script e librerie procedurali del progetto), omettendo classi esterne e dipendenze.
 
