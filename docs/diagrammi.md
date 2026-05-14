@@ -39,6 +39,7 @@
 
 > Nota: il progetto è implementato in stile procedurale PHP, quindi questo diagramma rappresenta il modello logico del dominio e i moduli di servizio corrispondenti.
 
+```mermaid
 classDiagram
 direction LR
 
@@ -298,3 +299,4 @@ DashboardController ..> PortfolioService
 DashboardController ..> AlertService
 DashboardController ..> MarketDataService
 DashboardController ..> PermissionService
+```
