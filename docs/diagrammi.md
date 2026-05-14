@@ -2,52 +2,85 @@
 
 ## Diagramma dei casi d'uso
 
-```mermaid
-flowchart LR
-    free[Utente Free]
-    premium[Utente Premium]
-    admin[Amministratore]
-    ai[Sistema AI]
-    data[Fonti dati esterne]
+```plantuml
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
 
-    login((Registrazione / Login))
-    dashboard((Consultazione dashboard))
-    market((Visualizzazione mercati))
-    portfolio((Gestione portafoglio virtuale))
-    alerts((Gestione alert prezzo))
-    profile((Aggiornamento profilo))
-    aiAnalysis((Analisi predittiva AI))
-    simulations((Simulazioni probabilistiche))
-    adminPanel((Gestione utenti e impostazioni))
+title TradeMarketAI - Architettura Casi d'Uso Raffinata
 
-    free --> login
-    premium --> login
-    admin --> login
+' --- ATTORI ---
+actor "Utente Registrato" as UR <<abstract>>
+actor "Utente Free" as Free
+actor "Utente Premium" as Premium
+actor "Amministratore" as Admin
+actor "Sistema AI" as AI <<system>>
+actor "Fonti dati esterne" as DataSources <<service>>
 
-    free --> dashboard
-    premium --> dashboard
-    admin --> dashboard
+' Ereditarietà per pulizia visiva
+Free --|> UR
+Premium --|> UR
 
-    free --> market
-    premium --> market
-    data --> market
+rectangle "TradeMarketAI Platform" {
 
-    free --> portfolio
-    premium --> portfolio
+    ' Accesso e Base
+    (UC1 - Login / Registrazione) as UC1
+    (UC6 - Gestione Profilo) as UC6
+    (UC11 - Upgrade a Premium) as UC11
+    
+    ' Operatività Standard
+    (UC2 - Consultazione Dashboard) as UC2
+    (UC3 - Visualizzazione Mercati) as UC3
+    (UC4 - Portafoglio Virtuale) as UC4
+    (UC5 - Gestione Alert Prezzo) as UC5
+    (CU9 - Forum Community) as CU9
+    
+    ' Funzioni Avanzate
+    (UC7 - Analisi Predittiva AI) as UC7
+    (UC8 - Simulazioni Probabilistiche) as UC8
+    (CU10 - Integrazione Broker) as CU10
+    
+    ' Backend e Admin
+    (UC12 - Accesso e Normalizzazione Dati) as UC12
+    (UC9_Admin - Gestione Utenti e Ruoli) as UC9A
+    (UC10_Admin - Impostazioni Sistema) as UC10A
+}
 
-    free --> alerts
-    premium --> alerts
+' --- RELAZIONI ---
+UR --> UC1
+UR --> UC2
+UR --> UC3
+UR --> UC4
+UR --> UC5
+UR --> UC6
+UR --> CU9
 
-    free --> profile
-    premium --> profile
-    admin --> profile
+Free --> UC11
 
-    premium --> aiAnalysis
-    premium --> simulations
-    ai --> aiAnalysis
-    ai --> simulations
+Premium --> UC7
+Premium --> UC8
+Premium --> CU10
 
-    admin --> adminPanel
+Admin --> UC9A
+Admin --> UC10A
+
+' --- SISTEMI ESTERNI E LOGICA DATI ---
+AI --> UC7
+AI --> UC8
+
+DataSources --> UC12
+' I casi d'uso "Includono" la normalizzazione dati per funzionare
+UC2 ..> UC12 : <<include>>
+UC3 ..> UC12 : <<include>>
+UC4 ..> UC12 : <<include>>
+UC5 ..> UC12 : <<include>>
+
+' L'upgrade estende le capacità della dashboard e del profilo
+UC11 ..> UC6 : <<extend>>
+UC11 ..> UC2 : <<extend>>
+
+@enduml
 ```
 
 ## Scenario dettagliato
