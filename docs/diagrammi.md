@@ -39,8 +39,15 @@
 
 > Nota: il progetto è implementato in stile procedurale PHP, quindi questo diagramma rappresenta il modello logico del dominio e i moduli di servizio corrispondenti.
 
-```mermaid
 classDiagram
+direction LR
+
+%% =========================
+%% AUTH DOMAIN
+%% =========================
+
+namespace Auth {
+
     class User {
         +int id
         +string username
@@ -62,6 +69,31 @@ classDiagram
         +string description
     }
 
+    class RefreshToken {
+        +int id
+        +int user_id
+        +string token_hash
+        +datetime expires_at
+        +bool revoked
+    }
+
+    class RolePermission {
+        +int role_id
+        +int permission_id
+    }
+
+    class UserPermission {
+        +int user_id
+        +int permission_id
+    }
+}
+
+%% =========================
+%% PORTFOLIO DOMAIN
+%% =========================
+
+namespace Portfolio {
+
     class Portfolio {
         +int id
         +int user_id
@@ -75,6 +107,13 @@ classDiagram
         +int quantity
         +decimal purchase_price
     }
+}
+
+%% =========================
+%% MONITORING DOMAIN
+%% =========================
+
+namespace Monitoring {
 
     class Alert {
         +int id
@@ -84,6 +123,13 @@ classDiagram
         +decimal threshold
         +bool is_active
     }
+}
+
+%% =========================
+%% MARKET DOMAIN
+%% =========================
+
+namespace Market {
 
     class MarketData {
         +int id
@@ -94,19 +140,13 @@ classDiagram
         +int volume
         +int market_cap
     }
+}
 
-    class RefreshToken {
-        +int id
-        +int user_id
-        +string token_hash
-        +datetime expires_at
-        +bool revoked
-    }
+%% =========================
+%% TRANSACTIONS DOMAIN
+%% =========================
 
-    class SystemSetting {
-        +string setting_key
-        +string setting_value
-    }
+namespace Transactions {
 
     class SubscriptionTransaction {
         +int id
@@ -114,8 +154,27 @@ classDiagram
         +int from_role_id
         +int to_role_id
         +string status
-        +string notes
+        +datetime transaction_date
     }
+}
+
+%% =========================
+%% CONFIG DOMAIN
+%% =========================
+
+namespace Config {
+
+    class SystemSetting {
+        +string setting_key
+        +string setting_value
+    }
+}
+
+%% =========================
+%% SERVICES LAYER
+%% =========================
+
+namespace Services {
 
     class AuthService {
         +registerUser()
@@ -133,28 +192,109 @@ classDiagram
         +refreshTokenRevoke()
     }
 
-    class DatabaseConnection {
-        +getDB()
+    class PermissionService {
+        +hasRolePermission()
+        +hasUserPermission()
     }
 
-    class Dashboard {
+    class PortfolioService {
+        +getPortfolioValue()
+        +addItem()
+        +removeItem()
+    }
+
+    class AlertService {
+        +createAlert()
+        +disableAlert()
+        +checkAlerts()
+    }
+
+    class MarketDataService {
+        +fetchMarketData()
+        +getMarketDataBySymbol()
+    }
+
+    class SubscriptionService {
+        +upgradeToPremium()
+        +validateTransaction()
+    }
+
+    class DashboardController <<boundary>> {
         +renderMarket()
         +renderPortfolio()
         +renderAlerts()
         +renderAdminPanel()
     }
+}
 
-    Role "1" --> "many" User
-    User "1" --> "many" Portfolio
-    Portfolio "1" --> "many" PortfolioItem
-    User "1" --> "many" Alert
-    User "1" --> "many" RefreshToken
-    Role "many" --> "many" Permission
-    User "1" --> "many" SubscriptionTransaction
-    DatabaseConnection ..> AuthService
-    DatabaseConnection ..> JwtService
-    AuthService ..> JwtService
-    AuthService ..> User
-    JwtService ..> RefreshToken
-    MarketData ..> Dashboard
-```
+%% =========================
+%% RELAZIONI AUTH (CORRETTE UML)
+%% =========================
+
+User "*" --> "1" Role : belongs_to
+
+User "1" --> "*" RefreshToken : owns
+
+Role "1" --> "*" RolePermission
+Permission "1" --> "*" RolePermission
+
+User "1" --> "*" UserPermission
+Permission "1" --> "*" UserPermission
+
+%% =========================
+%% PORTFOLIO RELATIONS
+%% =========================
+
+User "1" --> "*" Portfolio : owns
+Portfolio "1" --> "*" PortfolioItem : contains
+
+%% =========================
+%% MONITORING RELATIONS
+%% =========================
+
+User "1" --> "*" Alert : creates
+
+%% =========================
+%% MARKET RELATIONS
+%% =========================
+
+PortfolioItem "*" ..> "1" MarketData : symbol
+Alert "*" ..> "1" MarketData : symbol
+
+%% =========================
+%% TRANSACTIONS
+%% =========================
+
+User "1" --> "*" SubscriptionTransaction : performs
+
+%% =========================
+%% SERVICE DEPENDENCIES
+%% =========================
+
+AuthService ..> User
+AuthService ..> Role
+AuthService ..> Permission
+AuthService ..> JwtService
+
+JwtService ..> RefreshToken
+
+PermissionService ..> RolePermission
+PermissionService ..> UserPermission
+
+PortfolioService ..> Portfolio
+PortfolioService ..> PortfolioItem
+PortfolioService ..> MarketData
+
+AlertService ..> Alert
+AlertService ..> MarketData
+
+MarketDataService ..> MarketData
+
+SubscriptionService ..> SubscriptionTransaction
+SubscriptionService ..> SystemSetting
+
+DashboardController ..> AuthService
+DashboardController ..> PortfolioService
+DashboardController ..> AlertService
+DashboardController ..> MarketDataService
+DashboardController ..> PermissionService
