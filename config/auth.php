@@ -46,6 +46,35 @@ function clearAuthCookies(): void {
     ]);
 }
 
+function validateRegistrationInput(string $username, string $email, string $password): array {
+    $username = trim($username);
+    $email = trim(strtolower($email));
+
+    if (strlen($username) < 3 || strlen($username) > 50) {
+        return ['success' => false, 'message' => 'Username deve essere tra 3 e 50 caratteri.'];
+    }
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        return ['success' => false, 'message' => 'Email non valida.'];
+    }
+    if (strlen($password) < 8) {
+        return ['success' => false, 'message' => 'La password deve avere almeno 8 caratteri.'];
+    }
+    if (!preg_match('/[A-Z]/', $password) || !preg_match('/[0-9]/', $password)) {
+        return ['success' => false, 'message' => 'La password deve contenere almeno una maiuscola e un numero.'];
+    }
+
+    return [
+        'success' => true,
+        'username' => $username,
+        'email' => $email,
+        'password' => $password,
+    ];
+}
+
+function userHasPermission(array $permissions, string $permission): bool {
+    return in_array($permission, $permissions, true);
+}
+
 function setAuthCookies(int $userId, string $username, string $role, string $refreshToken): void {
     $accessToken = jwtCreate([
         'sub' => $userId,
@@ -162,7 +191,7 @@ function can(string $permission): bool {
         return false;
     }
 
-    return in_array($permission, $user['permissions'], true);
+    return userHasPermission($user['permissions'], $permission);
 }
 
 // Verifica che l'utente sia loggato, altrimenti redirect
@@ -179,7 +208,7 @@ function requireLogin(): array {
 // Verifica permesso o redirect con errore
 function requirePermission(string $permission): array {
     $user = requireLogin();
-    if (!in_array($permission, $user['permissions'], true)) {
+    if (!userHasPermission($user['permissions'], $permission)) {
         header('Location: dashboard.php?error=permission_denied');
         exit;
     }
@@ -224,22 +253,13 @@ function loginUser(string $email, string $password): array {
 function registerUser(string $username, string $email, string $password): array {
     $pdo = getDB();
 
-    // Validazione
-    $username = trim($username);
-    $email    = trim(strtolower($email));
+    $validation = validateRegistrationInput($username, $email, $password);
+    if (!$validation['success']) {
+        return ['success' => false, 'message' => $validation['message']];
+    }
 
-    if (strlen($username) < 3 || strlen($username) > 50) {
-        return ['success' => false, 'message' => 'Username deve essere tra 3 e 50 caratteri.'];
-    }
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        return ['success' => false, 'message' => 'Email non valida.'];
-    }
-    if (strlen($password) < 8) {
-        return ['success' => false, 'message' => 'La password deve avere almeno 8 caratteri.'];
-    }
-    if (!preg_match('/[A-Z]/', $password) || !preg_match('/[0-9]/', $password)) {
-        return ['success' => false, 'message' => 'La password deve contenere almeno una maiuscola e un numero.'];
-    }
+    $username = $validation['username'];
+    $email = $validation['email'];
 
     // Verifica unicità
     $check = $pdo->prepare("SELECT id FROM users WHERE email = ? OR username = ? LIMIT 1");

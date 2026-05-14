@@ -1,33 +1,34 @@
 # TradeMarketAi
 
-### Name of the creator
-*Teramo Ettore*
+TradeMarketAi è una piattaforma PHP/MySQL per consultare dati di mercato, gestire un portafoglio virtuale, configurare alert di prezzo e usare funzioni AI e probabilistiche per analisi più avanzate.
 
-### Name of the project
-*TradeMarketAI*
+## Informazioni rapide
 
-### Tagline
-*Win with AI. Don’t be ridden, but conquer the market*
+- Creatore: Teramo Ettore
+- Target: investitori principianti e utenti esperti
+- Tecnologie: HTML, CSS, JavaScript, PHP, MySQL
+- Demo: https://trademarket-ai-pulse.lovable.app
 
-### Description of the project
-*Website that allows users to follow the stock market, featuring AI-powered tools, index analysis, and market trends. It includes a probabilistic approach that aims to outperform the market using AI. Suitable for beginners who want to try their hand at stock trading.*
+## Documentazione
 
-### User target
-*Beginner investors and experienced users*
+- [Analisi requisiti](ANALISI%20REQUISITI.md)
+- [Casi d'uso testuali](CASI%20D'USO.md)
+- [Diagrammi di progetto](docs/diagrammi.md)
+- [Manuale utente](docs/manuale_utente.md)
 
-### Competitors
-*Trading 212, eToro, Trade Republic*
+## Test
 
-### Used languages
-*Html, css, js, php, MySQL*
+La repository include test unitari PHP basati su PHPUnit per la logica più importante e deterministica: validazione registrazione, verifica permessi e JWT.
 
-### Project demo
-https://trademarket-ai-pulse.lovable.app
+Per eseguire i test:
 
-### Local DB setup
-Usa il solo dump `auth_system.sql` aggiornato.
-Include gia:
+1. Installa le dipendenze con Composer.
+2. Esegui `composer test`.
+
+## Database locale
+
+Usa il dump aggiornato [auth_system.sql](auth_system.sql). Include già:
 - toggle admin per attivare/disattivare le transazioni;
 - toggle admin per attivare/disattivare i cursori live;
 - log `subscription_transactions`;
-- errore DB (`TRANSAZIONI_DISATTIVATE_DB`) quando si tenta il cambio piano con transazioni disattivate.
+- errore DB `TRANSAZIONI_DISATTIVATE_DB` quando si tenta il cambio piano con transazioni disattivate.
