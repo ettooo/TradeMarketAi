@@ -2,67 +2,7 @@
 
 ## Diagramma dei casi d'uso
 
-```mermaid
-graph LR
-    subgraph Actors["👥 ATTORI"]
-        UR["Utente Registrato<br/>(astratto)"]
-        Free["Utente Free"]
-        Premium["Utente Premium"]
-        Admin["Amministratore"]
-        AI["🤖 Sistema AI"]
-        DataSources["📊 Fonti dati"]
-    end
-    
-    subgraph Platform["🏢 TradeMarketAI Platform"]
-        UC1["UC1<br/>Login/Registrazione"]
-        UC2["UC2<br/>Dashboard"]
-        UC3["UC3<br/>Mercati"]
-        UC4["UC4<br/>Portafoglio"]
-        UC5["UC5<br/>Alert Prezzo"]
-        UC6["UC6<br/>Profilo"]
-        UC7["UC7<br/>Analisi AI"]
-        UC8["UC8<br/>Simulazioni"]
-        UC9A["UC9<br/>Gestione Utenti"]
-        UC10A["UC10<br/>Impostazioni"]
-        UC11["UC11<br/>Upgrade Premium"]
-        CU9["CU9<br/>Forum"]
-        CU10["CU10<br/>Broker"]
-        UC12["UC12<br/>Dati"]
-    end
-    
-    Free -->|eredita| UR
-    Premium -->|eredita| UR
-    
-    UR --> UC1
-    UR --> UC2
-    UR --> UC3
-    UR --> UC4
-    UR --> UC5
-    UR --> UC6
-    UR --> CU9
-    
-    Free --> UC11
-    
-    Premium --> UC7
-    Premium --> UC8
-    Premium --> CU10
-    
-    Admin --> UC9A
-    Admin --> UC10A
-    
-    AI --> UC7
-    AI --> UC8
-    
-    DataSources --> UC12
-    
-    UC2 -->|include| UC12
-    UC3 -->|include| UC12
-    UC4 -->|include| UC12
-    UC5 -->|include| UC12
-    
-    UC11 -->|extend| UC6
-    UC11 -->|extend| UC2
-```
+![TradeMarketAI - Architettura Casi d'Uso](images/use-case-diagram.png)
 
 ## Scenario dettagliato
 
