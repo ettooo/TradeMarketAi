@@ -2,85 +2,66 @@
 
 ## Diagramma dei casi d'uso
 
-```plantuml
-@startuml
-left to right direction
-skinparam packageStyle rectangle
-skinparam actorStyle awesome
-
-title TradeMarketAI - Architettura Casi d'Uso Raffinata
-
-' --- ATTORI ---
-actor "Utente Registrato" as UR <<abstract>>
-actor "Utente Free" as Free
-actor "Utente Premium" as Premium
-actor "Amministratore" as Admin
-actor "Sistema AI" as AI <<system>>
-actor "Fonti dati esterne" as DataSources <<service>>
-
-' Ereditarietà per pulizia visiva
-Free --|> UR
-Premium --|> UR
-
-rectangle "TradeMarketAI Platform" {
-
-    ' Accesso e Base
-    (UC1 - Login / Registrazione) as UC1
-    (UC6 - Gestione Profilo) as UC6
-    (UC11 - Upgrade a Premium) as UC11
+```mermaid
+graph LR
+    subgraph Actors["👥 ATTORI"]
+        UR["Utente Registrato<br/>(astratto)"]
+        Free["Utente Free"]
+        Premium["Utente Premium"]
+        Admin["Amministratore"]
+        AI["🤖 Sistema AI"]
+        DataSources["📊 Fonti dati"]
+    end
     
-    ' Operatività Standard
-    (UC2 - Consultazione Dashboard) as UC2
-    (UC3 - Visualizzazione Mercati) as UC3
-    (UC4 - Portafoglio Virtuale) as UC4
-    (UC5 - Gestione Alert Prezzo) as UC5
-    (CU9 - Forum Community) as CU9
+    subgraph Platform["🏢 TradeMarketAI Platform"]
+        UC1["UC1<br/>Login/Registrazione"]
+        UC2["UC2<br/>Dashboard"]
+        UC3["UC3<br/>Mercati"]
+        UC4["UC4<br/>Portafoglio"]
+        UC5["UC5<br/>Alert Prezzo"]
+        UC6["UC6<br/>Profilo"]
+        UC7["UC7<br/>Analisi AI"]
+        UC8["UC8<br/>Simulazioni"]
+        UC9A["UC9<br/>Gestione Utenti"]
+        UC10A["UC10<br/>Impostazioni"]
+        UC11["UC11<br/>Upgrade Premium"]
+        CU9["CU9<br/>Forum"]
+        CU10["CU10<br/>Broker"]
+        UC12["UC12<br/>Dati"]
+    end
     
-    ' Funzioni Avanzate
-    (UC7 - Analisi Predittiva AI) as UC7
-    (UC8 - Simulazioni Probabilistiche) as UC8
-    (CU10 - Integrazione Broker) as CU10
+    Free -->|eredita| UR
+    Premium -->|eredita| UR
     
-    ' Backend e Admin
-    (UC12 - Accesso e Normalizzazione Dati) as UC12
-    (UC9_Admin - Gestione Utenti e Ruoli) as UC9A
-    (UC10_Admin - Impostazioni Sistema) as UC10A
-}
-
-' --- RELAZIONI ---
-UR --> UC1
-UR --> UC2
-UR --> UC3
-UR --> UC4
-UR --> UC5
-UR --> UC6
-UR --> CU9
-
-Free --> UC11
-
-Premium --> UC7
-Premium --> UC8
-Premium --> CU10
-
-Admin --> UC9A
-Admin --> UC10A
-
-' --- SISTEMI ESTERNI E LOGICA DATI ---
-AI --> UC7
-AI --> UC8
-
-DataSources --> UC12
-' I casi d'uso "Includono" la normalizzazione dati per funzionare
-UC2 ..> UC12 : <<include>>
-UC3 ..> UC12 : <<include>>
-UC4 ..> UC12 : <<include>>
-UC5 ..> UC12 : <<include>>
-
-' L'upgrade estende le capacità della dashboard e del profilo
-UC11 ..> UC6 : <<extend>>
-UC11 ..> UC2 : <<extend>>
-
-@enduml
+    UR --> UC1
+    UR --> UC2
+    UR --> UC3
+    UR --> UC4
+    UR --> UC5
+    UR --> UC6
+    UR --> CU9
+    
+    Free --> UC11
+    
+    Premium --> UC7
+    Premium --> UC8
+    Premium --> CU10
+    
+    Admin --> UC9A
+    Admin --> UC10A
+    
+    AI --> UC7
+    AI --> UC8
+    
+    DataSources --> UC12
+    
+    UC2 -->|include| UC12
+    UC3 -->|include| UC12
+    UC4 -->|include| UC12
+    UC5 -->|include| UC12
+    
+    UC11 -->|extend| UC6
+    UC11 -->|extend| UC2
 ```
 
 ## Scenario dettagliato
