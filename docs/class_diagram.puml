@@ -1,0 +1,327 @@
+@startuml TradeMarketAi_ClassDiagram
+!define BOUNDARY_COLOR #FFD966
+!define ENTITY_COLOR #A4C2F4
+!define SERVICE_COLOR #D5A6BD
+!define CONFIG_COLOR #F4CCCC
+
+skinparam packageBackgroundColor #F0F0F0
+skinparam classBackgroundColor #FFFFFF
+skinparam classBorderColor #333333
+skinparam arrowColor #333333
+
+title TradeMarketAi - Diagramma delle Classi\n(Architettura Procedurale in PHP)
+
+' ===========================
+' AUTHENTICATION & AUTH DOMAIN
+' ===========================
+package "Auth Domain" #A4C2F4 {
+    entity User {
+        +int id (PK)
+        +string username
+        +string email
+        +string password_hash
+        +int role_id (FK)
+        +bool is_active
+        +timestamp created_at
+        +timestamp updated_at
+    }
+
+    entity Role {
+        +int id (PK)
+        +string name
+        +string description
+        +timestamp created_at
+    }
+
+    entity Permission {
+        +int id (PK)
+        +string name
+        +string description
+        +timestamp created_at
+    }
+
+    entity RefreshToken {
+        +int id (PK)
+        +int user_id (FK)
+        +string token_hash
+        +datetime expires_at
+        +bool revoked
+        +string user_agent
+        +string ip_address
+        +timestamp created_at
+    }
+
+    entity RolePermission {
+        +int role_id (FK)
+        +int permission_id (FK)
+    }
+
+    entity UserPermission {
+        +int user_id (FK)
+        +int permission_id (FK)
+    }
+}
+
+' ===========================
+' PORTFOLIO DOMAIN
+' ===========================
+package "Portfolio Domain" #D5A6BD {
+    entity Portfolio {
+        +int id (PK)
+        +int user_id (FK)
+        +string name
+        +timestamp created_at
+    }
+
+    entity PortfolioItem {
+        +int id (PK)
+        +int portfolio_id (FK)
+        +string symbol
+        +int quantity
+        +decimal purchase_price
+        +timestamp purchased_at
+    }
+}
+
+' ===========================
+' MARKET DOMAIN
+' ===========================
+package "Market Domain" #A4C2F4 {
+    entity MarketData {
+        +int id (PK)
+        +string symbol
+        +string name
+        +decimal price
+        +decimal change_pct
+        +int volume
+        +int market_cap
+        +timestamp fetched_at
+    }
+
+    entity Stock {
+        +int id (PK)
+        +string symbol
+        +decimal price
+        +decimal change_pct
+    }
+}
+
+' ===========================
+' MONITORING DOMAIN
+' ===========================
+package "Monitoring Domain" #FFD966 {
+    entity Alert {
+        +int id (PK)
+        +int user_id (FK)
+        +string symbol
+        +enum condition_type
+        +decimal threshold
+        +bool is_active
+        +timestamp created_at
+    }
+}
+
+' ===========================
+' TRANSACTION DOMAIN
+' ===========================
+package "Transaction Domain" #F4CCCC {
+    entity SubscriptionTransaction {
+        +int id (PK)
+        +int user_id (FK)
+        +int from_role_id (FK)
+        +int to_role_id (FK)
+        +string status
+        +datetime transaction_date
+    }
+}
+
+' ===========================
+' CONFIG DOMAIN
+' ===========================
+package "Configuration Domain" #F4CCCC {
+    entity SystemSetting {
+        +string setting_key (PK)
+        +string setting_value
+        +timestamp updated_at
+    }
+}
+
+' ===========================
+' SERVICES LAYER
+' ===========================
+package "Services Layer" #D5A6BD {
+    class AuthService {
+        {static} +registerUser(string, string, string): array
+        {static} +loginUser(string, string): array
+        {static} +logoutUser(): void
+        {static} +getCurrentUser(): ?array
+        {static} +isAuthenticated(): bool
+        {static} +validateRegistrationInput(string, string, string): array
+        {static} +userHasPermission(array, string): bool
+        {static} +setAuthCookies(int, string, string, string): void
+        {static} +clearAuthCookies(): void
+    }
+
+    class JwtService {
+        {static} +jwtCreate(array): string
+        {static} +jwtVerify(string): array
+        {static} +refreshTokenCreate(int, string, string): string
+        {static} +refreshTokenRotate(string): array
+        {static} +refreshTokenRevoke(string): void
+        {static} -base64url_encode(string): string
+        {static} -base64url_decode(string): string
+    }
+
+    class PermissionService {
+        {static} +getEffectivePermissionNames(int): array
+        {static} +getEffectivePermissionsDetailed(int): array
+        {static} +userHasPermission(array, string): bool
+    }
+
+    class PortfolioService {
+        {static} +getPortfolioByUser(int): array
+        {static} +getPortfolioItems(int): array
+        {static} +addPortfolioItem(int, string, int, decimal): bool
+        {static} +removePortfolioItem(int): bool
+        {static} +getPortfolioValue(int): decimal
+    }
+
+    class AlertService {
+        {static} +createAlert(int, string, string, decimal): bool
+        {static} +getUserAlerts(int): array
+        {static} +disableAlert(int): bool
+        {static} +checkAlerts(): array
+    }
+
+    class MarketDataService {
+        {static} +fetchMarketData(): bool
+        {static} +getMarketDataBySymbol(string): ?array
+        {static} +getAllMarketData(): array
+        {static} +updateMarketData(string, decimal, decimal, int, int): bool
+    }
+
+    class SubscriptionService {
+        {static} +upgradeToPremium(int): array
+        {static} +downgradeToFree(int): array
+        {static} +validateTransaction(): bool
+        {static} +getTransactionHistory(int): array
+    }
+
+    class DatabaseService {
+        {static} +getDB(): PDO
+        {static} -ensureConnection(): void
+    }
+}
+
+' ===========================
+' CONTROLLERS / BOUNDARY LAYER
+' ===========================
+package "Controllers" #FFD966 {
+    class DashboardController {
+        +renderMarketDashboard(): void
+        +renderPortfolioDashboard(): void
+        +renderAlertsDashboard(): void
+        +renderAdminPanel(): void
+    }
+
+    class AuthController {
+        +handleLogin(): void
+        +handleRegister(): void
+        +handleLogout(): void
+    }
+
+    class APIRouter {
+        +route(string): void
+        +respondOk(array): void
+        +respondCreated(array): void
+        +respondError(int, string): void
+        +getBody(): array
+    }
+}
+
+' ===========================
+' RELATIONSHIPS
+' ===========================
+
+' Auth Domain Relations
+User --> Role : "belongs_to\n1 : *"
+User --> RefreshToken : "owns\n1 : *"
+User --> UserPermission : "has\n1 : *"
+User --> Portfolio : "owns\n1 : *"
+User --> Alert : "creates\n1 : *"
+User --> SubscriptionTransaction : "performs\n1 : *"
+
+Role --> RolePermission : "has\n1 : *"
+Permission --> RolePermission : "linked_by\n1 : *"
+Permission --> UserPermission : "grants\n1 : *"
+
+' Portfolio Domain Relations
+Portfolio --> PortfolioItem : "contains\n1 : *"
+PortfolioItem --> MarketData : "references\n* : 1"
+
+' Market Relations
+Alert --> MarketData : "monitors\n* : 1"
+
+' Transaction Relations
+SubscriptionTransaction --> Role : "from_role\n* : 1"
+SubscriptionTransaction --> Role : "to_role\n* : 1"
+
+' Services to Entities
+AuthService ..> User : "manages"
+AuthService ..> Role : "reads"
+AuthService ..> Permission : "reads"
+JwtService ..> RefreshToken : "manages"
+PermissionService ..> RolePermission : "reads"
+PermissionService ..> UserPermission : "reads"
+PortfolioService ..> Portfolio : "manages"
+PortfolioService ..> PortfolioItem : "manages"
+MarketDataService ..> MarketData : "manages"
+AlertService ..> Alert : "manages"
+SubscriptionService ..> SubscriptionTransaction : "manages"
+SubscriptionService ..> SystemSetting : "reads"
+
+' Controllers to Services
+DashboardController ..> AuthService : "uses"
+DashboardController ..> PortfolioService : "uses"
+DashboardController ..> MarketDataService : "uses"
+DashboardController ..> AlertService : "uses"
+DashboardController ..> PermissionService : "uses"
+AuthController ..> AuthService : "uses"
+APIRouter ..> AuthService : "uses"
+APIRouter ..> PermissionService : "uses"
+
+' Database Service
+DatabaseService ..> User : "connects"
+AuthService ..> DatabaseService : "uses"
+JwtService ..> DatabaseService : "uses"
+PortfolioService ..> DatabaseService : "uses"
+AlertService ..> DatabaseService : "uses"
+MarketDataService ..> DatabaseService : "uses"
+SubscriptionService ..> DatabaseService : "uses"
+
+note right of User
+  Entità per i dati utente
+  e autenticazione
+end note
+
+note right of Portfolio
+  Gestione portafogli
+  virtuali dell'utente
+end note
+
+note right of Alert
+  Sistema di avvisi
+  per il monitoraggio
+end note
+
+note right of AuthService
+  Logica di autenticazione
+  e autorizzazione
+end note
+
+note right of JwtService
+  Token JWT con
+  HS256 signature
+end note
+
+@enduml
