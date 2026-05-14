@@ -93,7 +93,7 @@ namespace Auth {
 %% PORTFOLIO DOMAIN
 %% =========================
 
-namespace Portfolio {
+namespace PortfolioDomain {
 
     class Portfolio {
         +int id
