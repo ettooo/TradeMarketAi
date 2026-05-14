@@ -2,7 +2,7 @@
 
 ## Diagramma dei casi d'uso
 
-![TradeMarketAI - Architettura Casi d'Uso](images/use-case-diagram.png)
+![TradeMarketAI - Architettura Casi d'Uso](./images/diagrammadefinitivo.png)
 
 ## Scenario dettagliato
 
